@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Proacta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:        #14162B;
+    --violet:     #4A3B78;
+    --coral:      #FF6B6B;
+    --peach:      #FF9B62;
+    --gold:       #FFC857;
+    --mint:       #2FBFA4;
+    --mint-soft:  #E4F7F1;
+    --paper:      #FFFFFF;
+    --fog:        #F3F2FA;
+    --line:       #E7E5F2;
+    --text:       #1B1A2E;
+    --text-soft:  #706F8B;
+    --accent:     #FF6B6B;
+    --accent-2:   #FFC857;
+
+    --display: 'Space Grotesk', sans-serif;
+    --body: 'Plus Jakarta Sans', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family: var(--body);
+    color:var(--text);
+    background: radial-gradient(circle at 30% 0%, #3A3164 0%, #14162B 45%), #14162B;
+    min-height:100dvh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  button{font-family:inherit; cursor:pointer;}
+  input{font-family:inherit;}
+  ul{list-style:none;}
+
+  /* ---------- APP FRAME ---------- */
+  .app{
+    width:100%; max-width:430px; height:100dvh; max-height:930px;
+    background:var(--fog);
+    display:flex; flex-direction:column;
+    position:relative; overflow:hidden;
+  }
+  @media (min-width:520px){
+    .app{ border-radius:36px; box-shadow:0 40px 90px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06); margin:20px 0;}
+  }
+
+  /* ---------- TOP BAR ---------- */
+  .topbar{
+    flex-shrink:0; padding:18px 18px 14px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--paper); border-bottom:1px solid var(--line); z-index:5;
+  }
+  .topbar h1{font-family:var(--display); font-size:19px; font-weight:700;}
+  .stat-pills{display:flex; gap:8px; align-items:center;}
+  .pill{
+    display:flex; align-items:center; gap:4px; font-family:var(--display); font-weight:700; font-size:12.5px;
+    padding:6px 10px; border-radius:100px; background:var(--fog); border:1px solid var(--line);
+  }
+  .pill.coin{color:#B4791A; background:#FFF3D6; border-color:#FBE2A0;}
+  .pill.flame{color:#C23B3B; background:#FFE3E3; border-color:#FFC9C9;}
+  .iconbtn{background:var(--fog); border:1px solid var(--line); border-radius:100px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--text-soft); flex-shrink:0;}
+
+  /* ---------- SCROLL AREA ---------- */
+  .screens{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative;}
+  .screens::-webkit-scrollbar{display:none;}
+  .screen{display:none; padding:18px 18px 100px; animation:fadein .3s ease;}
+  .screen.active{display:block;}
+  @keyframes fadein{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+
+  /* ---------- BOTTOM NAV ---------- */
+  .navbar{
+    flex-shrink:0; display:flex; background:var(--paper); border-top:1px solid var(--line);
+    padding:10px 6px calc(10px + env(safe-area-inset-bottom));
+    position:relative; z-index:5;
+  }
+  .navbtn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none;
+    padding:6px 2px; border-radius:12px; color:var(--text-soft); transition: color .15s;
+  }
+  .navbtn .ic{font-size:19px; line-height:1;}
+  .navbtn .lbl{font-size:10.5px; font-weight:700;}
+  .navbtn.active{color:var(--accent);}
+
+  /* ---------- shared bits ---------- */
+  .section-label{font-family:var(--display); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-soft); margin:20px 0 10px;}
+  .section-label:first-child{margin-top:2px;}
+  .card{background:var(--paper); border-radius:18px; padding:16px; box-shadow:0 4px 16px rgba(20,22,43,0.06); margin-bottom:10px;}
+  .btn{font-family:var(--display); font-weight:700; font-size:13.5px; border:none; border-radius:100px; padding:12px 20px; display:inline-flex; align-items:center; justify-content:center; gap:6px;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#1B1A2E;}
+  .btn-dark{background:var(--ink); color:#fff;}
+  .btn-ghost{background:var(--fog); color:var(--text); border:1px solid var(--line);}
+  .btn-danger{background:#FFE3E3; color:#C23B3B;}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 13px; font-size:11.5px;}
+  .btn[disabled]{opacity:.45; pointer-events:none;}
+
+  /* ===================== HOME ===================== */
+  .greet-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .greet-row h2{font-family:var(--display); font-size:20px; font-weight:700;}
+  .greet-row .sub{font-size:12.5px; color:var(--text-soft);}
+  .lvl-card .xp-top{display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--text-soft); margin-bottom:8px;}
+  .bar{height:9px; background:var(--line); border-radius:100px; overflow:hidden;}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--mint),var(--gold)); border-radius:100px; transition:width .5s ease;}
+
+  .radar-card{background:var(--ink); border-radius:18px; padding:18px; color:#fff; margin-bottom:10px;}
+  .radar-card .rtitle{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;}
+  .radar-card .rtitle strong{font-family:var(--display); font-size:14.5px;}
+  .radar-card .rtitle span{font-size:11.5px; color:rgba(255,255,255,0.55);}
+  .gauge-wrap{position:relative; display:flex; justify-content:center; margin-top:6px;}
+  .needle{transform-origin: 130px 130px; transition: transform 1s cubic-bezier(.2,.9,.25,1);}
+  .gauge-label{position:absolute; bottom:2px; left:0; right:0; text-align:center; font-family:var(--display); font-weight:700; font-size:13px;}
+  .radar-legend{display:flex; justify-content:space-between; margin-top:2px; font-size:10.5px; color:rgba(255,255,255,0.5);}
+
+  .task-row{display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);}
+  .task-row:last-child{border-bottom:none;}
+  .empty-row{padding:16px 4px; text-align:center; font-size:12.5px; color:var(--text-soft);}
+  .check{width:22px; height:22px; border-radius:7px; border:2px solid var(--line); flex-shrink:0; position:relative; background:none;}
+  .check.done{background:var(--mint); border-color:var(--mint);}
+  .check.done::after{content:''; position:absolute; left:6px; top:2px; width:6px; height:10px; border:2px solid #fff; border-top:none; border-left:none; transform:rotate(40deg);}
+  .tt{flex:1; text-align:left;}
+  .tt strong{display:block; font-size:13.5px;}
+  .tt strong.done-txt{color:var(--text-soft); text-decoration:line-through;}
+  .tt span{font-size:11.5px; color:var(--text-soft);}
+  .zone{font-size:10px; font-weight:700; padding:4px 8px; border-radius:100px; flex-shrink:0;}
+  .zone.chill{background:var(--mint-soft); color:#1B8E77;}
+  .zone.watch{background:#FFF1D6; color:#B4791A;}
+  .zone.cram{background:#FFE3E3; color:#C23B3B;}
+
+  .gz-card{background:linear-gradient(135deg,#20223F,#3A2E5C); border-radius:16px; padding:14px 16px; color:#fff; position:relative; margin-top:6px;}
+  .gz-card .who{display:flex; align-items:center; gap:8px; font-size:11px; color:rgba(255,255,255,0.55); margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;}
+  .gz-card p{font-size:13.5px; line-height:1.55;}
+  .gz-close{position:absolute; top:10px; right:12px; background:none; border:none; color:rgba(255,255,255,0.5); font-size:14px;}
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--ink); color:#fff; font-family:var(--display); font-weight:700; font-size:12.5px;
+    padding:10px 18px; border-radius:100px; transition:all .3s ease; pointer-events:none; z-index:50; white-space:nowrap;
+    max-width:88%; overflow:hidden; text-overflow:ellipsis;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* ===================== TASKS ===================== */
+  .task-card{background:var(--paper); border-radius:18px; margin-bottom:12px; box-shadow:0 4px 16px rgba(20,22,43,0.06); overflow:hidden;}
+  .task-card-head{padding:15px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;}
+  .task-card-head .info{flex:1;}
+  .task-card-head h4{font-size:14.5px; margin-bottom:3px;}
+  .task-card-head .meta{font-size:11.5px; color:var(--text-soft);}
+  .ring{width:38px; height:38px; flex-shrink:0; position:relative;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring-pct{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; font-family:var(--display);}
+  .chevron{transition:transform .2s; color:var(--text-soft); font-size:12px;}
+  .task-card.open .chevron{transform:rotate(90deg);}
+  .task-card-body{max-height:0; overflow:hidden; transition:max-height .3s ease;}
+  .task-card.open .task-card-body{max-height:600px;}
+  .sub-row{display:flex; align-items:center; gap:10px; padding:9px 16px; border-top:1px solid var(--line);}
+  .sub-row span{font-size:13px; flex:1;}
+  .sub-del{background:none; border:none; color:var(--text-soft); font-size:14px; padding:2px 6px;}
+  .celebrate{margin:0 16px 14px; background:var(--mint-soft); color:#1B8E77; font-size:12px; font-weight:700; padding:9px 12px; border-radius:10px; display:none;}
+  .task-card.complete .celebrate{display:block;}
+  .add-task-card{background:var(--paper); border:1.5px dashed var(--line); border-radius:18px; padding:14px; text-align:center; font-weight:700; color:var(--text-soft); font-size:13px;}
+  .add-form{background:var(--paper); border-radius:18px; padding:16px; margin-bottom:12px; display:none;}
+  .add-form.show{display:block;}
+  .add-form input, .add-form select{width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); font-size:13.5px; margin-bottom:10px; background:var(--fog);}
+  .add-form .row{display:flex; gap:8px;}
+  .add-sub-row{display:flex; gap:8px; padding:9px 16px;}
+  .add-sub-row input{flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--line); font-size:12.5px; background:var(--fog);}
+  .add-sub-row button{flex-shrink:0;}
+
+  /* ===================== PREMIUM ===================== */
+  .prem-banner{border-radius:16px; padding:14px 16px; margin-bottom:12px; background:linear-gradient(135deg,var(--mint),#1B8E77); color:#fff; display:none; align-items:center; gap:10px;}
+  .prem-banner.show{display:flex;}
+  .prem-banner strong{display:block; font-size:13.5px;}
+  .prem-banner span{font-size:11.5px; opacity:.85;}
+  .lockin-card{background:var(--ink); border-radius:20px; padding:20px; color:#fff; margin-bottom:14px;}
+  .lockin-card h3{font-family:var(--display); font-size:16px; margin-bottom:4px;}
+  .lockin-card .sub{font-size:12px; color:rgba(255,255,255,0.55); margin-bottom:16px;}
+  .pips{display:flex; gap:6px; margin-bottom:14px;}
+  .pip{flex:1; height:28px; border-radius:8px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:rgba(255,255,255,0.4);}
+  .pip.on{background:linear-gradient(135deg,var(--coral),var(--gold)); color:#1B1A2E;}
+  .unlock-banner{background:rgba(255,200,87,0.16); border:1px solid rgba(255,200,87,0.4); border-radius:12px; padding:12px; font-size:12.5px; color:var(--gold); font-weight:600; display:none; margin-top:6px;}
+  .lockin-card.unlocked .unlock-banner{display:block;}
+  .lockin-card.unlocked .pips-cta{display:none;}
+
+  .redeem-card{text-align:center;}
+  .redeem-card .rc-title{font-weight:700; margin-bottom:4px; font-size:13.5px;}
+  .redeem-card .rc-sub{font-size:11.5px; color:var(--text-soft); margin-bottom:12px;}
+
+  .tier-card{background:var(--paper); border-radius:16px; padding:15px 16px; margin-bottom:10px; display:flex; gap:14px; align-items:center;}
+  .tier-card .num{font-family:var(--display); font-size:22px; font-weight:700; color:var(--violet); flex-shrink:0; width:44px; text-align:center;}
+  .tier-card .num span{display:block; font-size:10px; color:var(--text-soft); font-weight:600;}
+  .tier-card h4{font-size:13.5px; margin-bottom:2px;}
+  .tier-card p{font-size:11.5px; color:var(--text-soft);}
+
+  .perk-row{display:flex; align-items:center; gap:12px; background:var(--paper); border-radius:14px; padding:12px 14px; margin-bottom:8px;}
+  .perk-row .ic{width:34px; height:34px; border-radius:10px; background:var(--fog); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:16px;}
+  .perk-row strong{font-size:13px; display:block;}
+  .perk-row span{font-size:11px; color:var(--text-soft);}
+  .perk-status{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:100px; margin-left:auto; flex-shrink:0;}
+  .perk-status.locked{background:#F1F0F7; color:var(--text-soft);}
+  .perk-status.active{background:var(--mint-soft); color:#1B8E77;}
+
+  /* ===================== SQUAD ===================== */
+  .lb-row{display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line);}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-row.you{background:var(--mint-soft); border-radius:12px; padding:10px 8px; border-bottom:none;}
+  .lb-rank{width:20px; text-align:center; font-family:var(--display); font-weight:700; font-size:12px; color:var(--text-soft);}
+  .avatar{width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:700; font-size:12px; color:#fff; flex-shrink:0;}
+  .lb-name{flex:1;}
+  .lb-name strong{font-size:12.5px; display:block;}
+  .lb-name span{font-size:10.5px; color:var(--text-soft);}
+  .lb-xp{font-size:11.5px; font-weight:700; color:var(--violet); font-family:var(--display);}
+  .badge-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .badge{font-size:11px; font-weight:700; padding:7px 11px; border-radius:100px; background:var(--mint-soft); color:#1B8E77;}
+  .chat-card{background:var(--paper); border-radius:16px; padding:14px; display:flex; flex-direction:column; height:340px;}
+  .chat-log{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;}
+  .msg{max-width:78%; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;}
+  .msg.them{background:var(--fog); align-self:flex-start;}
+  .msg.me{background:linear-gradient(135deg,var(--coral),var(--gold)); color:#1B1A2E; align-self:flex-end;}
+  .msg b{display:block; font-size:10px; opacity:.6; margin-bottom:2px; font-weight:700;}
+  .chat-input-row{display:flex; gap:8px;}
+  .chat-input-row input{flex:1; border:1px solid var(--line); background:var(--fog); border-radius:100px; padding:10px 14px; font-size:13px;}
+  .chat-input-row button{width:38px; height:38px; border-radius:50%; background:var(--ink); color:#fff; border:none; flex-shrink:0;}
+
+  /* ===================== PROFILE ===================== */
+  .profile-head{display:flex; flex-direction:column; align-items:center; padding:10px 0 6px;}
+  .big-avatar{width:76px; height:76px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:700; font-size:26px; color:#1B1A2E; margin-bottom:10px;}
+  .profile-head h3{font-family:var(--display); font-size:17px;}
+  .profile-head .title-badge{font-size:11.5px; font-weight:700; color:var(--violet); background:#F0EAFF; padding:4px 10px; border-radius:100px; margin-top:6px;}
+  .role-pill{font-size:10px; font-weight:700; color:var(--text-soft); background:var(--fog); padding:3px 9px; border-radius:100px; margin-top:6px; text-transform:uppercase; letter-spacing:.04em;}
+  .swatches{display:flex; gap:10px; margin:6px 0 4px;}
+  .swatch{width:34px; height:34px; border-radius:50%; border:3px solid transparent; cursor:pointer;}
+  .swatch.selected{border-color:var(--ink);}
+  .title-pick{display:flex; gap:8px; flex-wrap:wrap;}
+  .title-pick .badge{cursor:pointer; opacity:.55; border:2px solid transparent;}
+  .title-pick .badge.selected{opacity:1; border-color:#1B8E77;}
+  .shield-row{display:flex; align-items:center; justify-content:space-between;}
+  .shield-row .txt strong{display:block; font-size:13px;}
+  .shield-row .txt span{font-size:11.5px; color:var(--text-soft);}
+  .toggle{width:44px; height:26px; border-radius:100px; background:var(--line); position:relative; border:none; flex-shrink:0;}
+  .toggle::after{content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+  .toggle.on{background:var(--mint);}
+  .toggle.on::after{left:21px;}
+  .locked-note{font-size:11px; color:var(--text-soft); margin-top:8px;}
+
+  /* ===================== AUTH ===================== */
+  .authwrap{width:100%; max-width:430px; min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:24px;}
+  @media (min-width:520px){ .authwrap{min-height:auto; margin:20px 0;} }
+  .auth-card{width:100%; background:var(--paper); border-radius:26px; padding:30px 24px; box-shadow:0 30px 80px rgba(0,0,0,0.4);}
+  .auth-logo{font-family:var(--display); font-weight:700; font-size:22px; text-align:center; margin-bottom:4px;}
+  .auth-tagline{text-align:center; font-size:12px; color:var(--text-soft); margin-bottom:20px;}
+  .auth-tabs{display:flex; background:var(--fog); border-radius:100px; padding:4px; margin-bottom:20px;}
+  .auth-tab{flex:1; border:none; background:none; padding:9px; border-radius:100px; font-family:var(--display); font-weight:700; font-size:12.5px; color:var(--text-soft);}
+  .auth-tab.active{background:var(--paper); color:var(--text); box-shadow:0 2px 8px rgba(20,22,43,0.08);}
+  .auth-pane{display:none;}
+  .auth-pane.active{display:block; animation:fadein .25s ease;}
+  .auth-pane label{display:block; font-size:11.5px; font-weight:700; color:var(--text-soft); margin:12px 0 5px;}
+  .auth-pane label:first-child{margin-top:0;}
+  .auth-pane input{width:100%; padding:12px 13px; border-radius:11px; border:1px solid var(--line); background:var(--fog); font-size:13.5px;}
+  .auth-pane input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .auth-pane .btn{margin-top:18px;}
+  .auth-err{color:#C23B3B; font-size:11.5px; font-weight:600; min-height:14px; margin-top:8px;}
+  .auth-ok{color:#1B8E77; font-size:11.5px; font-weight:600; min-height:14px; margin-top:8px;}
+  .link-btn{display:block; width:100%; text-align:center; background:none; border:none; color:var(--violet); font-weight:700; font-size:12px; margin-top:12px; padding:6px;}
+  .demo-hint{margin-top:18px; background:var(--fog); border-radius:12px; padding:10px 12px; font-size:11px; color:var(--text-soft); line-height:1.7;}
+  .auth-desc{font-size:12.5px; color:var(--text-soft); line-height:1.5; margin-bottom:4px;}
+  .auth-footnote{text-align:center; font-size:10.5px; color:var(--text-soft); margin-top:18px; line-height:1.5;}
+
+  /* ===================== ADMIN ===================== */
+  .admin-stats{display:flex; gap:8px; margin-bottom:14px;}
+  .admin-stats .stat{flex:1; background:var(--paper); border-radius:14px; padding:12px; text-align:center;}
+  .admin-stats .stat b{display:block; font-family:var(--display); font-size:18px;}
+  .admin-stats .stat span{font-size:10px; color:var(--text-soft);}
+  .user-row{background:var(--paper); border-radius:14px; padding:12px 14px; margin-bottom:8px;}
+  .user-row .urow-top{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .user-row .uinfo{flex:1; min-width:0;}
+  .user-row .uinfo strong{display:block; font-size:13px;}
+  .user-row .uinfo span{font-size:11px; color:var(--text-soft); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .tag-row{display:flex; gap:5px; flex-shrink:0;}
+  .role-tag{font-size:9.5px; font-weight:700; padding:3px 8px; border-radius:100px; background:var(--fog); text-transform:uppercase; white-space:nowrap;}
+  .role-tag.admin{background:#F0EAFF; color:var(--violet);}
+  .prem-tag{font-size:9.5px; font-weight:700; padding:3px 8px; border-radius:100px; background:var(--mint-soft); color:#1B8E77; white-space:nowrap;}
+  .uactions{display:flex; gap:6px; flex-wrap:wrap;}
+  .uactions .btn{padding:7px 11px; font-size:11px;}
+
+  /* ===================== DARK MODE ===================== */
+  .app.dark{
+    --ink:        #F3F2FA;
+    --paper:      #1E2039;
+    --fog:        #14162B;
+    --line:       #2C2E4A;
+    --text:       #F1F0FA;
+    --text-soft:  #9B99BE;
+    --mint-soft:  #143A32;
+  }
+  .app.dark .task-card, .app.dark .card, .app.dark .add-form, .app.dark .chat-card,
+  .app.dark .user-row, .app.dark .admin-stats .stat, .app.dark .tier-card, .app.dark .perk-row{
+    box-shadow:0 4px 16px rgba(0,0,0,0.35);
+  }
+  .app.dark .topbar, .app.dark .navbar{ background:var(--paper); }
+  .app.dark .add-form input, .app.dark .add-form select, .app.dark .add-sub-row input,
+  .app.dark .cal-input-row input, .app.dark .cal-input-row textarea, .app.dark .note-editor textarea,
+  .app.dark .note-editor input, .app.dark .ai-input-row input{ background:var(--fog); color:var(--text); border-color:var(--line);}
+  .app.dark .pip{ background:rgba(255,255,255,0.06); }
+  .app.dark .role-tag{ background:var(--fog); }
+
+  /* ===================== ANIMATIONS ===================== */
+  .btn{transition:transform .12s ease, filter .12s ease;}
+  .btn:active{transform:scale(.95);}
+  .check{transition:transform .15s ease, background .15s ease, border-color .15s ease;}
+  .check.done{animation:checkpop .28s ease;}
+  @keyframes checkpop{0%{transform:scale(.7);} 60%{transform:scale(1.15);} 100%{transform:scale(1);}}
+  .swatch, .navbtn, .task-card, .card, .perk-row, .tier-card, .user-row, .lb-row{transition:transform .15s ease, box-shadow .15s ease;}
+  .task-card:active{transform:scale(.99);}
+  .navbtn.active .ic{animation:navpop .28s ease;}
+  @keyframes navpop{0%{transform:translateY(2px) scale(.85);} 60%{transform:translateY(-2px) scale(1.15);} 100%{transform:translateY(0) scale(1);}}
+  .pill.coin.pulse{animation:coinpulse .5s ease;}
+  @keyframes coinpulse{0%{transform:scale(1);} 40%{transform:scale(1.18); background:#FFE9AE;} 100%{transform:scale(1);}}
+  .pill.flame .flame-ic{display:inline-block; animation:flicker 2.2s ease-in-out infinite;}
+  @keyframes flicker{0%,100%{transform:scale(1) rotate(0deg);} 25%{transform:scale(1.08) rotate(-3deg);} 50%{transform:scale(.96) rotate(2deg);} 75%{transform:scale(1.05) rotate(-1deg);}}
+  .card, .task-card, .perk-row, .tier-card, .lb-row, .user-row{animation:riseIn .35s ease both;}
+  @keyframes riseIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+  .confetti-piece{position:fixed; z-index:999; font-size:16px; pointer-events:none; animation:confettiFall 1s ease-out forwards;}
+  @keyframes confettiFall{0%{opacity:1; transform:translate(0,0) rotate(0deg);} 100%{opacity:0; transform:translate(var(--dx,0px), 90px) rotate(220deg);}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important;}
+  }
+
+  /* ===================== SUBTABS (Calendar screen) ===================== */
+  .subtabs{display:flex; background:var(--paper); border-radius:100px; padding:4px; margin-bottom:16px; box-shadow:0 4px 16px rgba(20,22,43,0.06);}
+  .subtab{flex:1; border:none; background:none; padding:9px; border-radius:100px; font-family:var(--display); font-weight:700; font-size:12.5px; color:var(--text-soft);}
+  .subtab.active{background:var(--fog); color:var(--text);}
+  .calsub{display:none;}
+  .calsub.active{display:block; animation:fadein .25s ease;}
+
+  /* ===================== CALENDAR ===================== */
+  .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .cal-head h3{font-family:var(--display); font-size:15.5px;}
+  .cal-nav{display:flex; gap:6px;}
+  .cal-nav button{width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--paper); color:var(--text); font-size:13px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px;}
+  .cal-dow{text-align:center; font-size:10px; font-weight:700; color:var(--text-soft); padding-bottom:4px;}
+  .cal-day{aspect-ratio:1; border-radius:10px; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; font-weight:600; position:relative; border:1.5px solid transparent; cursor:pointer;}
+  .cal-day.empty{background:none; cursor:default;}
+  .cal-day.today{border-color:var(--accent);}
+  .cal-day.selected{background:var(--ink); color:#fff;}
+  .cal-day .dot{width:5px; height:5px; border-radius:50%; background:var(--coral); position:absolute; bottom:5px;}
+  .cal-day.selected .dot{background:var(--gold);}
+  .cal-events-list{margin-top:14px;}
+  .ev-row{display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--paper); border-radius:12px; margin-bottom:8px;}
+  .ev-row .evdate{font-family:var(--display); font-weight:700; font-size:11px; color:var(--violet); background:#F0EAFF; border-radius:8px; padding:6px 8px; text-align:center; flex-shrink:0; min-width:44px;}
+  .app.dark .ev-row .evdate{background:var(--fog);}
+  .ev-row .evinfo{flex:1; min-width:0;}
+  .ev-row .evinfo strong{display:block; font-size:13px;}
+  .ev-row .evinfo span{font-size:11px; color:var(--text-soft); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ev-row .evdel{background:none; border:none; color:var(--text-soft); font-size:14px; flex-shrink:0;}
+  .cal-input-row{display:flex; flex-direction:column; gap:8px; background:var(--paper); border-radius:16px; padding:14px; margin-top:12px;}
+  .cal-input-row input{padding:11px 12px; border-radius:10px; border:1px solid var(--line); font-size:13px; background:var(--fog);}
+  .ai-quickadd{background:linear-gradient(135deg,#20223F,#3A2E5C); border-radius:16px; padding:14px 16px; color:#fff; margin-bottom:14px;}
+  .ai-quickadd .aq-title{display:flex; align-items:center; gap:6px; font-family:var(--display); font-weight:700; font-size:13px; margin-bottom:8px;}
+  .ai-quickadd .ai-input-row{display:flex; gap:8px;}
+  .ai-quickadd input{flex:1; border:none; border-radius:100px; padding:10px 14px; font-size:12.5px; background:rgba(255,255,255,0.1); color:#fff;}
+  .ai-quickadd input::placeholder{color:rgba(255,255,255,0.5);}
+  .ai-quickadd button{width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#1B1A2E; border:none; flex-shrink:0;}
+  .ai-quickadd .aq-hint{font-size:10.5px; color:rgba(255,255,255,0.5); margin-top:8px;}
+
+  /* ===================== NOTES ===================== */
+  .notes-list{display:grid; gap:8px; margin-bottom:14px;}
+  .note-card{background:var(--paper); border-radius:14px; padding:13px 14px; cursor:pointer;}
+  .note-card strong{display:block; font-size:13px; margin-bottom:3px;}
+  .note-card span{font-size:11.5px; color:var(--text-soft); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .note-editor{background:var(--paper); border-radius:16px; padding:14px; display:none;}
+  .note-editor.show{display:block;}
+  .note-editor input{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); font-size:14px; font-weight:700; margin-bottom:8px; background:var(--fog);}
+  .note-editor textarea{width:100%; min-height:120px; padding:11px 12px; border-radius:10px; border:1px solid var(--line); font-size:13px; background:var(--fog); resize:vertical; font-family:inherit; line-height:1.5;}
+  .note-editor .note-actions{display:flex; gap:8px; margin-top:10px;}
+  .note-editor .note-actions .btn{flex:1;}
+  .ai-panel{margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);}
+  .ai-panel .ai-label{display:flex; align-items:center; gap:6px; font-family:var(--display); font-weight:700; font-size:12px; color:var(--violet); margin-bottom:10px;}
+  .ai-chat-log{display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:220px; overflow-y:auto;}
+  .ai-chat-log .msg{max-width:88%;}
+  .ai-lock{background:var(--fog); border-radius:14px; padding:16px; text-align:center; margin-top:14px;}
+  .ai-lock .lock-ic{font-size:22px; margin-bottom:6px;}
+  .ai-lock p{font-size:12px; color:var(--text-soft); margin-bottom:10px; line-height:1.5;}
+  .ai-thinking{font-size:11.5px; color:var(--text-soft); font-style:italic;}
+</style>
+</head>
+<body>
+
+<!-- ===================== AUTH SCREENS ===================== -->
+<div class="authwrap" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">✺ Proacta</div>
+    <div class="auth-tagline">Stop cramming. Start winning.</div>
+
+    <div class="auth-tabs" id="authTabs">
+      <button class="auth-tab active" id="tabBtn-login" onclick="switchAuthTab('login')">Log in</button>
+      <button class="auth-tab" id="tabBtn-signup" onclick="switchAuthTab('signup')">Sign up</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="auth-pane active" id="pane-login">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="you@school.edu" autocomplete="username">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+      <div class="auth-err" id="loginErr"></div>
+      <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">Log in</button>
+      <button class="link-btn" onclick="switchAuthTab('forgot')">Forgot password?</button>
+      <div class="demo-hint">
+        <strong>Demo accounts</strong><br>
+        Admin — admin@proacta.app / Admin123!<br>
+        Student — migs@proacta.app / Student123!
+      </div>
+    </div>
+
+    <!-- SIGN UP -->
+    <div class="auth-pane" id="pane-signup">
+      <label for="suName">Name</label>
+      <input type="text" id="suName" placeholder="Your name" autocomplete="name">
+      <label for="suEmail">Email</label>
+      <input type="email" id="suEmail" placeholder="you@school.edu" autocomplete="username">
+      <label for="suPass">Password</label>
+      <input type="password" id="suPass" placeholder="min. 8 characters" autocomplete="new-password">
+      <label for="suPass2">Confirm password</label>
+      <input type="password" id="suPass2" placeholder="repeat password" autocomplete="new-password">
+      <div class="auth-err" id="signupErr"></div>
+      <button class="btn btn-primary btn-block" id="signupBtn" onclick="doSignup()">Create account</button>
+    </div>
+
+    <!-- FORGOT PASSWORD: step 1 -->
+    <div class="auth-pane" id="pane-forgot">
+      <p class="auth-desc">Enter your account email. Since this is a self-contained demo with no email server, we'll simulate the reset code right here.</p>
+      <label for="fpEmail">Email</label>
+      <input type="email" id="fpEmail" placeholder="you@school.edu">
+      <div class="auth-err" id="fpErr"></div>
+      <button class="btn btn-primary btn-block" onclick="sendResetCode()">Send reset code</button>
+      <button class="link-btn" onclick="switchAuthTab('login')">Back to log in</button>
+    </div>
+
+    <!-- FORGOT PASSWORD: step 2 -->
+    <div class="auth-pane" id="pane-reset">
+      <p class="auth-desc">Demo mode — your reset code is <strong id="demoCodeShown">------</strong>. A real deployment would email this instead of showing it.</p>
+      <label for="rCode">6-digit code</label>
+      <input type="text" id="rCode" placeholder="123456" maxlength="6">
+      <label for="rPass">New password</label>
+      <input type="password" id="rPass" placeholder="min. 8 characters">
+      <div class="auth-err" id="resetErr"></div>
+      <button class="btn btn-primary btn-block" onclick="doResetPassword()">Reset password</button>
+      <button class="link-btn" onclick="switchAuthTab('login')">Back to log in</button>
+    </div>
+
+    <div class="auth-footnote">Prototype auth: accounts are kept in memory for this browser tab only and reset on reload. See the note at the end of chat for what a production build needs.</div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="app" id="appRoot" style="display:none;">
+
+  <div class="topbar">
+    <h1 id="pageTitle">Home</h1>
+    <div class="stat-pills">
+      <div class="pill coin">🪙 <span id="coinCount">0</span></div>
+      <div class="pill flame"><span class="flame-ic">🔥</span> <span id="streakCount">0</span></div>
+      <button class="iconbtn" id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+      <button class="iconbtn" id="logoutBtn" onclick="doLogout()" title="Log out">⎋</button>
+    </div>
+  </div>
+
+  <div class="screens">
+
+    <!-- ===================== HOME ===================== -->
+    <div class="screen active" data-screen="home">
+      <div class="greet-row">
+        <div>
+          <h2 id="greetName">Hey there 👋</h2>
+          <div class="sub" id="greetSub">Today · 0 tasks</div>
+        </div>
+      </div>
+
+      <div class="card lvl-card">
+        <div class="xp-top"><span>Level <span id="levelNum">1</span></span><span><span id="xpNum">0</span> / <span id="xpMaxNum">500</span> XP</span></div>
+        <div class="bar"><i id="xpBar" style="width:0%;"></i></div>
+      </div>
+
+      <div class="radar-card">
+        <div class="rtitle"><strong>Cram Radar</strong><span id="radarTaskName">All caught up</span></div>
+        <div class="gauge-wrap">
+          <svg width="220" height="128" viewBox="0 0 260 150">
+            <defs>
+              <linearGradient id="arcgrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#2FBFA4"/>
+                <stop offset="50%" stop-color="#FFC857"/>
+                <stop offset="100%" stop-color="#FF6B6B"/>
+              </linearGradient>
+            </defs>
+            <path d="M 10 130 A 120 120 0 0 1 250 130" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="18" stroke-linecap="round"/>
+            <path d="M 10 130 A 120 120 0 0 1 250 130" fill="none" stroke="url(#arcgrad)" stroke-width="18" stroke-linecap="round"/>
+            <g class="needle" id="homeNeedle" style="transform:rotate(0deg);">
+              <line x1="130" y1="130" x2="130" y2="30" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="130" cy="130" r="8" fill="#fff"/>
+            </g>
+          </svg>
+        </div>
+        <div class="gauge-label" id="radarLabel" style="position:static; margin-top:-6px;">Chill Zone</div>
+        <div class="radar-legend"><span>Chill</span><span>Watch</span><span>Cram</span></div>
+      </div>
+
+      <div class="section-label">Today's tasks</div>
+      <div class="card" style="padding:4px 12px;" id="homeTaskList"></div>
+
+      <div class="gz-card" id="gzCard" style="display:none;">
+        <button class="gz-close" onclick="document.getElementById('gzCard').style.display='none'">✕</button>
+        <div class="who">📣 Proacta notification</div>
+        <p id="gzText"></p>
+      </div>
+    </div>
+
+    <!-- ===================== TASKS ===================== -->
+    <div class="screen" data-screen="tasks">
+      <div class="section-label" style="margin-top:2px;">Your requirements</div>
+      <div id="taskCards"></div>
+
+      <div class="add-form" id="addForm">
+        <input type="text" id="newTaskTitle" placeholder="Task title, e.g. Lab Report 3">
+        <div class="row">
+          <input type="text" id="newTaskDue" placeholder="Due, e.g. 5 days">
+          <select id="newTaskZone">
+            <option value="chill">Chill</option>
+            <option value="watch">Watch</option>
+            <option value="cram">Cram</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="addTask()">Add task</button>
+      </div>
+      <button class="add-task-card" style="width:100%; border:1.5px dashed var(--line); background:none;" onclick="toggleAddForm()">+ Add a new task</button>
+    </div>
+
+    <!-- ===================== CALENDAR & NOTES ===================== -->
+    <div class="screen" data-screen="calendar">
+      <div class="subtabs">
+        <button class="subtab active" id="subtabBtn-cal" onclick="switchCalSub('cal')">Calendar</button>
+        <button class="subtab" id="subtabBtn-notes" onclick="switchCalSub('notes')">Notes</button>
+      </div>
+
+      <!-- CALENDAR SUB-TAB -->
+      <div class="calsub active" id="calsub-cal">
+        <div class="ai-quickadd">
+          <div class="aq-title">✨ Tell AI about a deadline</div>
+          <div class="ai-input-row">
+            <input type="text" id="quickAddInput" placeholder='e.g. "I have a deadline in October 27"' onkeydown="if(event.key==='Enter') quickAddDeadline()">
+            <button onclick="quickAddDeadline()" title="Add with AI">➤</button>
+          </div>
+          <div class="aq-hint" id="quickAddHint">Premium feature — turns a sentence into a real calendar entry.</div>
+        </div>
+
+        <div class="cal-head">
+          <h3 id="calMonthLabel">Month Year</h3>
+          <div class="cal-nav">
+            <button onclick="calShiftMonth(-1)">‹</button>
+            <button onclick="calShiftMonth(1)">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="calDowRow"></div>
+        <div class="cal-grid" id="calGrid"></div>
+
+        <div class="section-label">Upcoming</div>
+        <div class="cal-events-list" id="calEventsList"></div>
+
+        <div class="cal-input-row">
+          <input type="text" id="newEvTitle" placeholder="Deadline or activity title">
+          <input type="date" id="newEvDate">
+          <input type="text" id="newEvNote" placeholder="Notes (optional)">
+          <button class="btn btn-primary btn-block" onclick="addEventManual()">Add to calendar</button>
+        </div>
+      </div>
+
+      <!-- NOTES SUB-TAB -->
+      <div class="calsub" id="calsub-notes">
+        <div id="notesListWrap">
+          <div class="notes-list" id="notesList"></div>
+          <button class="add-task-card" style="width:100%; border:1.5px dashed var(--line); background:none;" onclick="newNote()">+ New note</button>
+        </div>
+
+        <div class="note-editor" id="noteEditor">
+          <input type="text" id="noteTitleInput" placeholder="Note title">
+          <textarea id="noteBodyInput" placeholder="Write your notes here…"></textarea>
+          <div class="note-actions">
+            <button class="btn btn-ghost btn-block" onclick="closeNoteEditor()">Back</button>
+            <button class="btn btn-danger btn-block" onclick="deleteCurrentNote()">Delete</button>
+            <button class="btn btn-primary btn-block" onclick="saveCurrentNote()">Save</button>
+          </div>
+
+          <div class="ai-panel" id="aiPanelUnlocked" style="display:none;">
+            <div class="ai-label">🧠 AI Study Coach</div>
+            <button class="btn btn-ghost btn-block" style="margin-bottom:10px;" onclick="scanNoteForDeadlines()">Scan this note for deadlines</button>
+            <div class="ai-chat-log" id="aiChatLog"></div>
+            <div class="ai-input-row" style="display:flex; gap:8px;">
+              <input type="text" id="aiAskInput" placeholder="Ask about this note…" style="flex:1; padding:10px 12px; border-radius:100px; border:1px solid var(--line); background:var(--fog); font-size:12.5px;" onkeydown="if(event.key==='Enter') askAiAboutNote()">
+              <button class="btn btn-dark" onclick="askAiAboutNote()">Ask</button>
+            </div>
+          </div>
+          <div class="ai-lock" id="aiPanelLocked">
+            <div class="lock-ic">🔒</div>
+            <p>AI Study Coach — summaries, Q&amp;A, and automatic deadline detection — is a Premium perk.</p>
+            <button class="btn btn-primary" onclick="goToPremium()">Unlock Premium</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PREMIUM ===================== -->
+    <div class="screen" data-screen="premium">
+      <div class="prem-banner" id="premBanner">
+        <div style="font-size:20px;">👑</div>
+        <div><strong>Premium is active</strong><span id="premBannerLabel">via 7-Day Lock-In</span></div>
+      </div>
+
+      <div class="lockin-card" id="lockinCard">
+        <h3>7-Day Lock-In</h3>
+        <div class="sub">Finish 1 task every day for 7 days straight</div>
+        <div class="pips" id="pips"></div>
+        <div class="pips-cta">
+          <button class="btn btn-primary btn-block" id="checkinBtn" onclick="checkIn()">Check in today</button>
+        </div>
+        <div class="unlock-banner">🎉 7-day Premium unlocked + 500 coins credited.</div>
+      </div>
+
+      <div class="section-label">Other ways in</div>
+      <div class="tier-card">
+        <div class="num">14<span>days</span></div>
+        <div><h4>The Streak Holder</h4><p>Finish every major task without entering the Cram Zone.</p></div>
+      </div>
+      <div class="tier-card">
+        <div class="num">30<span>days</span></div>
+        <div><h4>The Early Finisher</h4><p>5 easy + 5 major tasks, all completed ahead of schedule.</p></div>
+      </div>
+      <div class="card redeem-card">
+        <div class="rc-title">Redeem coins instantly</div>
+        <div class="rc-sub">No streak required — trade coins you've already earned for 7 days of Premium.</div>
+        <button class="btn btn-dark btn-block" onclick="redeemPremium()">Redeem 1000 🪙 for 7-day Premium</button>
+      </div>
+
+      <div class="section-label">Premium perks</div>
+      <div class="perk-row"><div class="ic">🧠</div><div><strong>AI Study Coach</strong><span>Personalized help, when it applies</span></div><div class="perk-status locked" id="perk-1">Locked</div></div>
+      <div class="perk-row"><div class="ic">📊</div><div><strong>Advanced Analytics</strong><span>Progress reports over time</span></div><div class="perk-status locked" id="perk-2">Locked</div></div>
+      <div class="perk-row"><div class="ic">🎨</div><div><strong>Premium Customization</strong><span>Make your profile yours</span></div><div class="perk-status locked" id="perk-3">Locked</div></div>
+      <div class="perk-row"><div class="ic">🛡️</div><div><strong>Streak Shield</strong><span>Protects one missed day</span></div><div class="perk-status locked" id="perk-4">Locked</div></div>
+      <div class="perk-row"><div class="ic">📡</div><div><strong>Cram Radar Alerts</strong><span>Early warnings, not late ones</span></div><div class="perk-status locked" id="perk-5">Locked</div></div>
+    </div>
+
+    <!-- ===================== SQUAD ===================== -->
+    <div class="screen" data-screen="squad">
+      <div class="section-label" style="margin-top:2px;">Leaderboard</div>
+      <div class="card" id="leaderboardCard"></div>
+
+      <div class="section-label">Your titles</div>
+      <div class="card"><div class="badge-row" id="titlesBadgeRow"></div></div>
+
+      <div class="section-label">Squad chat</div>
+      <div class="chat-card">
+        <div class="chat-log" id="chatLog">
+          <div class="msg them"><b>Sam</b>bet i finish before you 👀</div>
+          <div class="msg them"><b>Alex</b>the radar says otherwise for both of you lol</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Say something...">
+          <button onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PROFILE ===================== -->
+    <div class="screen" data-screen="profile">
+      <div class="profile-head">
+        <div class="big-avatar" id="bigAvatar">ST</div>
+        <h3 id="profName">Student</h3>
+        <div class="sub" style="color:var(--text-soft); font-size:12px;">Level <span id="profLevel">1</span> · <span id="profStreak">0</span>-day streak</div>
+        <div class="title-badge" id="titleBadge">🌱 Newcomer</div>
+        <div class="role-pill" id="profRole">Student</div>
+      </div>
+
+      <div class="section-label">Premium customization</div>
+      <div class="card">
+        <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:10px;">Accent color</div>
+        <div class="swatches" id="swatchRow">
+          <div class="swatch selected" style="background:#FF6B6B;" data-c1="#FF6B6B" data-c2="#FFC857" onclick="setTheme(this)"></div>
+          <div class="swatch" style="background:#2FBFA4;" data-c1="#2FBFA4" data-c2="#B7F0D8" onclick="setTheme(this)"></div>
+          <div class="swatch" style="background:#4A3B78;" data-c1="#4A3B78" data-c2="#C7B8FF" onclick="setTheme(this)"></div>
+          <div class="swatch" style="background:#FF9B62;" data-c1="#FF9B62" data-c2="#FFE3A0" onclick="setTheme(this)"></div>
+        </div>
+        <div style="font-size:12.5px; color:var(--text-soft); margin:14px 0 10px;">Displayed title</div>
+        <div class="title-pick" id="titlePickRow">
+          <span class="badge selected" onclick="setTitle(this,'🌱 Newcomer')">🌱 Newcomer</span>
+          <span class="badge" onclick="setTitle(this,'🌅 Early Bird')">🌅 Early Bird</span>
+          <span class="badge" onclick="setTitle(this,'🚫 No-Cram Streak')">🚫 No-Cram Streak</span>
+          <span class="badge" onclick="setTitle(this,'🔁 Comeback Kid')">🔁 Comeback Kid</span>
+        </div>
+        <div class="locked-note" id="customizeLockNote" style="display:none;">🔒 Unlock Premium to save these — free accounts preview only.</div>
+      </div>
+
+      <div class="section-label">Streak Shield</div>
+      <div class="card shield-row">
+        <div class="txt"><strong>Protect today's streak</strong><span>Premium perk — miss a day without losing it</span></div>
+        <button class="toggle" id="shieldToggle" onclick="toggleShield()"></button>
+      </div>
+    </div>
+
+    <!-- ===================== ADMIN ===================== -->
+    <div class="screen" data-screen="admin">
+      <div class="section-label" style="margin-top:2px;">Overview</div>
+      <div class="admin-stats">
+        <div class="stat"><b id="admStatUsers">0</b><span>Users</span></div>
+        <div class="stat"><b id="admStatPremium">0</b><span>Premium</span></div>
+        <div class="stat"><b id="admStatCoins">0</b><span>Coins in economy</span></div>
+      </div>
+      <div class="section-label">All accounts</div>
+      <div id="adminUserList"></div>
+    </div>
+
+  </div>
+
+  <div class="navbar">
+    <button class="navbtn active" data-tab="home"><span class="ic">🏠</span><span class="lbl">Home</span></button>
+    <button class="navbtn" data-tab="tasks"><span class="ic">🧩</span><span class="lbl">Tasks</span></button>
+    <button class="navbtn" data-tab="calendar"><span class="ic">🗓️</span><span class="lbl">Calendar</span></button>
+    <button class="navbtn" data-tab="premium"><span class="ic">🔓</span><span class="lbl">Premium</span></button>
+    <button class="navbtn" data-tab="squad"><span class="ic">👥</span><span class="lbl">Squad</span></button>
+    <button class="navbtn" data-tab="profile"><span class="ic">👤</span><span class="lbl">Profile</span></button>
+    <button class="navbtn" data-tab="admin" id="navAdminBtn" style="display:none;"><span class="ic">🛠️</span><span class="lbl">Admin</span></button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* =========================================================================
+   PROACTA — prototype auth + points/premium logic
+   -------------------------------------------------------------------------
+   Everything below runs entirely client-side, in memory. There is no
+   server, so "accounts" live in the `db` object for as long as this tab
+   stays open. Passwords are obfuscated (not real hashing) purely so the
+   plaintext isn't sitting in the object as you inspect it in devtools —
+   this is NOT secure and must not be treated as production auth.
+   ========================================================================= */
+
+/* ---------------- helpers ---------------- */
+function hashPass(p){
+  // Demo-only reversible obfuscation. Replace with real server-side
+  // hashing (bcrypt/argon2) in any real deployment.
+  try { return btoa(unescape(encodeURIComponent(p))).split('').reverse().join(''); }
+  catch(e){ return p; }
+}
+function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function genCode(){ return String(Math.floor(100000 + Math.random()*900000)); }
+function isoInDays(n){
+  const d = new Date();
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function initialsOf(name){
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return 'ST';
+  return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+}
+
+/* ---------------- default state for a new account ---------------- */
+function freshState(name){
+  return {
+    initials: initialsOf(name),
+    coins: 50, xp: 0, xpMax: 500, level: 1, streak: 0, lockInDay: 0,
+    premiumActive: false, premiumLabel: '',
+    shieldOn: false,
+    accentC1: '#FF6B6B', accentC2: '#FFC857', swatchIndex: 0,
+    titleBadge: '🌱 Newcomer', titleIndex: 0,
+    nextTaskId: 2,
+    darkMode: false,
+    tasks: [
+      {id:1, title:'Try Proacta out', due:'today', zone:'chill',
+        subtasks:[{t:'Add your first real task below', done:false}], celebrated:false}
+    ],
+    events: [],
+    nextEventId: 1,
+    notes: [],
+    nextNoteId: 1
+  };
+}
+
+/* ---------------- seed accounts ---------------- */
+let db = {
+  'admin@proacta.app': {
+    name:'Admin', email:'admin@proacta.app', role:'admin',
+    passHash: hashPass('Admin123!'),
+    state: (()=>{ const s = freshState('Admin'); s.coins = 9999; s.level = 10; s.streak = 40; return s; })()
+  },
+  'migs@proacta.app': {
+    name:'Migs', email:'migs@proacta.app', role:'student',
+    passHash: hashPass('Student123!'),
+    state: {
+      initials:'MI', coins:480, xp:320, xpMax:500, level:6, streak:12, lockInDay:3,
+      premiumActive:false, premiumLabel:'',
+      shieldOn:false, accentC1:'#FF6B6B', accentC2:'#FFC857', swatchIndex:0,
+      titleBadge:'🌅 Early Bird', titleIndex:1, nextTaskId:4, darkMode:false,
+      events:[
+        {id:1, title:'Stats Problem Set due', date: isoInDays(2), note:'Same deadline as the task list'},
+        {id:2, title:'Thesis Chapter 2 draft', date: isoInDays(6), note:''}
+      ], nextEventId:3,
+      notes:[
+        {id:1, title:'Stats formulas to remember', body:'Variance = average of squared deviations from the mean.\nStandard deviation = sqrt(variance).\n\nProf mentioned a pop quiz might happen before the problem set is due.', updatedAt: Date.now()}
+      ], nextNoteId:2,
+      tasks:[
+        {id:1, title:'Thesis Chapter 2', due:'6 days left', zone:'chill',
+          subtasks:[
+            {t:'Outline the chapter sections', done:true},
+            {t:'Gather 5 sources', done:true},
+            {t:'Draft the introduction', done:true},
+            {t:'Draft the body sections', done:false},
+            {t:'Add in-text citations', done:false},
+            {t:'Proofread & format', done:false}
+          ], celebrated:false},
+        {id:2, title:'Stats Problem Set', due:'2 days left', zone:'watch',
+          subtasks:[
+            {t:'Problems 1-5', done:false},
+            {t:'Problems 6-10', done:false},
+            {t:'Check answers', done:false}
+          ], celebrated:false},
+        {id:3, title:'Read Module 4', due:'due today', zone:'chill',
+          subtasks:[
+            {t:'Read pages 1-20', done:true},
+            {t:'Answer reflection questions', done:false}
+          ], celebrated:false}
+      ]
+    }
+  }
+};
+const npcClassmates = [
+  {name:'Alex L.', xp:1240, streak:18, bg:'var(--gold)', initials:'AL'},
+  {name:'Sam R.', xp:870, streak:9, bg:'var(--mint)', initials:'SR'},
+  {name:'Jia T.', xp:640, streak:6, bg:'var(--violet)', initials:'JT'}
+];
+let pendingResetCodes = {}; // email -> code
+let currentUserEmail = null;
+let state = null; // pointer into db[currentUserEmail].state while logged in
+let openTaskId = null;
+
+/* ---------------- AUTH: tabs ---------------- */
+function switchAuthTab(name){
+  document.querySelectorAll('.auth-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+name).classList.add('active');
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+  if(name==='login' || name==='signup'){
+    document.getElementById('tabBtn-'+name).classList.add('active');
+  }
+  ['loginErr','signupErr','fpErr','resetErr'].forEach(id=>document.getElementById(id).textContent='');
+}
+
+/* ---------------- AUTH: sign up ---------------- */
+function doSignup(){
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('suPass').value;
+  const pass2 = document.getElementById('suPass2').value;
+  const err = document.getElementById('signupErr');
+
+  if(!name){ err.textContent = 'Enter your name.'; return; }
+  if(!validEmail(email)){ err.textContent = 'Enter a valid email address.'; return; }
+  if(db[email]){ err.textContent = 'An account with that email already exists.'; return; }
+  if(pass.length < 8){ err.textContent = 'Password must be at least 8 characters.'; return; }
+  if(pass !== pass2){ err.textContent = 'Passwords don\'t match.'; return; }
+
+  err.textContent = '';
+  db[email] = { name, email, role:'student', passHash: hashPass(pass), state: freshState(name) };
+  toast('Account created — welcome to Proacta!');
+  enterApp(db[email]);
+}
+
+/* ---------------- AUTH: log in ---------------- */
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  const btn = document.getElementById('loginBtn');
+
+  const user = db[email];
+  if(!user || user.passHash !== hashPass(pass)){
+    err.textContent = 'Incorrect email or password.';
+    return;
+  }
+  err.textContent = '';
+  btn.textContent = 'Logging in…';
+  btn.disabled = true;
+  setTimeout(()=>{
+    btn.textContent = 'Log in';
+    btn.disabled = false;
+    enterApp(user);
+  }, 350);
+}
+
+function doLogout(){
+  currentUserEmail = null;
+  state = null;
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPass').value = '';
+  switchAuthTab('login');
+}
+
+/* ---------------- AUTH: forgot password ---------------- */
+function openForgot(){ switchAuthTab('forgot'); }
+
+function sendResetCode(){
+  const email = document.getElementById('fpEmail').value.trim().toLowerCase();
+  const err = document.getElementById('fpErr');
+  if(!validEmail(email)){ err.textContent = 'Enter a valid email address.'; return; }
+  if(!db[email]){ err.textContent = 'No account uses that email.'; return; }
+  err.textContent = '';
+  const code = genCode();
+  pendingResetCodes[email] = code;
+  document.getElementById('demoCodeShown').textContent = code;
+  document.getElementById('rCode').value = '';
+  document.getElementById('rPass').value = '';
+  document.getElementById('pane-reset').dataset.email = email;
+  switchAuthTab('reset');
+  toast('Reset code generated (demo mode)');
+}
+
+function doResetPassword(){
+  const email = document.getElementById('pane-reset').dataset.email;
+  const code = document.getElementById('rCode').value.trim();
+  const newPass = document.getElementById('rPass').value;
+  const err = document.getElementById('resetErr');
+
+  if(code !== pendingResetCodes[email]){ err.textContent = 'That code doesn\'t match.'; return; }
+  if(newPass.length < 8){ err.textContent = 'Password must be at least 8 characters.'; return; }
+
+  db[email].passHash = hashPass(newPass);
+  delete pendingResetCodes[email];
+  err.textContent = '';
+  toast('Password reset — log in with your new password');
+  switchAuthTab('login');
+}
+
+/* ---------------- ENTER APP ---------------- */
+function enterApp(user){
+  currentUserEmail = user.email;
+  state = user.state;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'flex';
+
+  document.getElementById('greetName').textContent = 'Hey, ' + user.name.split(' ')[0] + ' 👋';
+  document.getElementById('bigAvatar').textContent = state.initials;
+  document.getElementById('profName').textContent = user.name;
+  document.getElementById('profRole').textContent = user.role === 'admin' ? 'Admin' : 'Student';
+  document.getElementById('navAdminBtn').style.display = (user.role === 'admin') ? 'flex' : 'none';
+
+  document.documentElement.style.setProperty('--accent', state.accentC1);
+  document.documentElement.style.setProperty('--accent-2', state.accentC2);
+  document.querySelectorAll('#swatchRow .swatch').forEach((el,i)=>el.classList.toggle('selected', i===state.swatchIndex));
+  document.querySelectorAll('#titlePickRow .badge').forEach((el,i)=>el.classList.toggle('selected', i===state.titleIndex));
+  document.getElementById('titleBadge').textContent = state.titleBadge;
+  document.getElementById('shieldToggle').classList.toggle('on', state.shieldOn);
+  document.getElementById('appRoot').classList.toggle('dark', !!state.darkMode);
+  document.getElementById('themeToggle').textContent = state.darkMode ? '☀️' : '🌙';
+  calViewDate = new Date();
+  activeNoteId = null;
+
+  // reset nav to home
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.navbtn[data-tab="home"]').classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelector('.screen[data-screen="home"]').classList.add('active');
+  document.getElementById('pageTitle').textContent = 'Home';
+
+  renderAll();
+}
+
+function renderAll(){
+  renderStats();
+  renderRadar();
+  renderHomeList();
+  renderTasksScreen();
+  renderPips();
+  renderPremiumBanner();
+  renderCramAlert();
+  renderLeaderboard();
+  renderTitlesRow();
+  renderCalendar();
+  renderNotesList();
+  if(currentUserEmail && db[currentUserEmail].role === 'admin') renderAdmin();
+}
+
+/* ---------------- THEME ---------------- */
+function toggleTheme(){
+  if(!state) return;
+  state.darkMode = !state.darkMode;
+  document.getElementById('appRoot').classList.toggle('dark', state.darkMode);
+  document.getElementById('themeToggle').textContent = state.darkMode ? '☀️' : '🌙';
+}
+
+/* ---------------- CONFETTI ---------------- */
+function confettiBurst(originEl){
+  if(!originEl) return;
+  const rect = originEl.getBoundingClientRect();
+  const bits = ['🎉','✨','🪙','⭐'];
+  for(let i=0;i<7;i++){
+    const s = document.createElement('span');
+    s.className = 'confetti-piece';
+    s.textContent = bits[Math.floor(Math.random()*bits.length)];
+    s.style.left = (rect.left + rect.width/2) + 'px';
+    s.style.top = (rect.top + rect.height/2) + 'px';
+    s.style.setProperty('--dx', (Math.random()*100-50)+'px');
+    document.body.appendChild(s);
+    setTimeout(()=>s.remove(), 1000);
+  }
+}
+
+/* ---------------- AI (real Claude API call — works when this file is
+   running as a Claude.ai artifact; if it can't reach the API — e.g. the
+   file was saved and opened outside Claude.ai — a lightweight local
+   date-parser fallback kicks in so the feature still works, just less
+   smart) ---------------- */
+async function callClaudeJSON(userPrompt, systemPrompt){
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role:'user', content:userPrompt }]
+    })
+  });
+  const data = await response.json();
+  const text = (data.content || []).map(b=>b.text||'').join('\n');
+  return text;
+}
+function localDateParse(text){
+  const months = {january:0,jan:0,february:1,feb:1,march:2,mar:2,april:3,apr:3,may:4,june:5,jun:5,
+    july:6,jul:6,august:7,aug:7,september:8,sep:8,sept:8,october:9,oct:9,november:10,nov:10,december:11,dec:11};
+  const re = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i;
+  const m = text.match(re);
+  if(!m) return null;
+  const monthIdx = months[m[1].toLowerCase()];
+  const day = parseInt(m[2],10);
+  const now = new Date();
+  let year = now.getFullYear();
+  let candidate = new Date(year, monthIdx, day);
+  if(candidate < now) candidate = new Date(year+1, monthIdx, day);
+  return candidate.toISOString().slice(0,10);
+}
+
+/* ---------------- CALENDAR & NOTES sub-tabs ---------------- */
+function switchCalSub(name){
+  document.querySelectorAll('.calsub').forEach(p=>p.classList.remove('active'));
+  document.getElementById('calsub-'+name).classList.add('active');
+  document.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('subtabBtn-'+name).classList.add('active');
+  if(name==='cal') renderCalendar();
+  if(name==='notes') renderNotesList();
+}
+function goToPremium(){
+  document.querySelector('.navbtn[data-tab="premium"]').click();
+}
+
+/* ---------------- CALENDAR ---------------- */
+let calViewDate = new Date();
+let calSelectedDate = null;
+function calShiftMonth(n){
+  calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth()+n, 1);
+  renderCalendar();
+}
+function fmtEvDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString(undefined,{month:'short', day:'numeric'});
+}
+function renderCalendar(){
+  if(!state) return;
+  const dow = document.getElementById('calDowRow');
+  if(dow && !dow.dataset.built){
+    dow.innerHTML = ['S','M','T','W','T','F','S'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+    dow.dataset.built = '1';
+  }
+  const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+  document.getElementById('calMonthLabel').textContent = calViewDate.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+  const first = new Date(y,m,1);
+  const startOffset = first.getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayIso = new Date().toISOString().slice(0,10);
+  const evByDate = {};
+  state.events.forEach(e=>{ (evByDate[e.date] = evByDate[e.date]||[]).push(e); });
+
+  const grid = document.getElementById('calGrid');
+  let html = '';
+  for(let i=0;i<startOffset;i++) html += '<div class="cal-day empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isToday = iso === todayIso;
+    const isSel = iso === calSelectedDate;
+    const hasEv = !!evByDate[iso];
+    html += `<div class="cal-day ${isToday?'today':''} ${isSel?'selected':''}" onclick="calSelectDay('${iso}')">${d}${hasEv?'<span class="dot"></span>':''}</div>`;
+  }
+  grid.innerHTML = html;
+  renderEventsList();
+}
+function calSelectDay(iso){
+  calSelectedDate = (calSelectedDate === iso) ? null : iso;
+  document.getElementById('newEvDate').value = iso;
+  renderCalendar();
+}
+function renderEventsList(){
+  const wrap = document.getElementById('calEventsList');
+  let list = [...state.events].sort((a,b)=>a.date.localeCompare(b.date));
+  if(calSelectedDate) list = list.filter(e=>e.date===calSelectedDate);
+  if(!list.length){
+    wrap.innerHTML = '<div class="empty-row">'+(calSelectedDate ? 'No deadlines that day.' : 'Nothing on the calendar yet — add one below, or ask AI.')+'</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(e=>`
+    <div class="ev-row">
+      <div class="evdate">${fmtEvDate(e.date)}</div>
+      <div class="evinfo"><strong>${escapeHtml(e.title)}</strong>${e.note?('<span>'+escapeHtml(e.note)+'</span>'):''}</div>
+      <button class="evdel" onclick="deleteEvent(${e.id})">✕</button>
+    </div>
+  `).join('');
+}
+function addEventManual(){
+  const title = document.getElementById('newEvTitle').value.trim();
+  const date = document.getElementById('newEvDate').value;
+  const note = document.getElementById('newEvNote').value.trim();
+  if(!title || !date){ toast('Add a title and a date'); return; }
+  state.events.push({id: state.nextEventId++, title, date, note});
+  document.getElementById('newEvTitle').value='';
+  document.getElementById('newEvNote').value='';
+  renderCalendar();
+  toast('Added to calendar');
+}
+function deleteEvent(id){
+  state.events = state.events.filter(e=>e.id!==id);
+  renderCalendar();
+}
+async function quickAddDeadline(){
+  if(!state.premiumActive){ toast('Unlock Premium to use AI deadline detection'); return; }
+  const input = document.getElementById('quickAddInput');
+  const text = input.value.trim();
+  if(!text){ toast('Type a sentence first, e.g. "deadline in October 27"'); return; }
+  const hint = document.getElementById('quickAddHint');
+  hint.textContent = 'AI is reading that…';
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const sys = 'You extract deadlines from a student\'s casual message. Today\'s date is '+today+'. Respond with ONLY strict JSON, no other text, no markdown fences, in this exact shape: {"title":"short label for the deadline","date":"YYYY-MM-DD","note":""}. If the year is not stated, infer the nearest future occurrence of that date. If no deadline is mentioned, respond with {"title":null}.';
+    const raw = await callClaudeJSON(text, sys);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    if(!parsed.title || !parsed.date) throw new Error('no-deadline');
+    state.events.push({id: state.nextEventId++, title: parsed.title, date: parsed.date, note: parsed.note||''});
+    hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
+    input.value='';
+    renderCalendar();
+    toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
+  } catch(err){
+    // fall back to a simple local parser so the feature still works
+    // even if the live AI call can't be reached from this environment
+    const iso = localDateParse(text);
+    if(iso){
+      state.events.push({id: state.nextEventId++, title: text.length>40?text.slice(0,40)+'…':text, date: iso, note:'Added via quick-parse (AI unreachable)'});
+      hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
+      input.value='';
+      renderCalendar();
+      toast('Added via quick-parse — AI call failed');
+    } else {
+      hint.textContent = 'Couldn\'t find a date in that — try including a month and day.';
+      toast('No date detected');
+    }
+  }
+}
+
+/* ---------------- NOTES ---------------- */
+let activeNoteId = null;
+function renderNotesList(){
+  if(!state) return;
+  const wrap = document.getElementById('notesList');
+  if(!state.notes.length){
+    wrap.innerHTML = '<div class="empty-row">No notes yet — tap "New note" to start one.</div>';
+  } else {
+    wrap.innerHTML = [...state.notes].sort((a,b)=>b.updatedAt-a.updatedAt).map(n=>`
+      <div class="note-card" onclick="openNote(${n.id})">
+        <strong>${escapeHtml(n.title || 'Untitled note')}</strong>
+        <span>${escapeHtml(n.body || 'Empty note')}</span>
+      </div>
+    `).join('');
+  }
+  document.getElementById('notesListWrap').style.display = 'block';
+  document.getElementById('noteEditor').classList.remove('show');
+}
+function newNote(){
+  activeNoteId = null;
+  document.getElementById('noteTitleInput').value = '';
+  document.getElementById('noteBodyInput').value = '';
+  document.getElementById('aiChatLog').innerHTML = '';
+  openNoteEditor();
+}
+function openNote(id){
+  const n = state.notes.find(x=>x.id===id);
+  if(!n) return;
+  activeNoteId = id;
+  document.getElementById('noteTitleInput').value = n.title;
+  document.getElementById('noteBodyInput').value = n.body;
+  document.getElementById('aiChatLog').innerHTML = '';
+  openNoteEditor();
+}
+function openNoteEditor(){
+  document.getElementById('notesListWrap').style.display = 'none';
+  document.getElementById('noteEditor').classList.add('show');
+  document.getElementById('aiPanelUnlocked').style.display = state.premiumActive ? 'block' : 'none';
+  document.getElementById('aiPanelLocked').style.display = state.premiumActive ? 'none' : 'block';
+}
+function closeNoteEditor(){
+  activeNoteId = null;
+  renderNotesList();
+}
+function saveCurrentNote(){
+  const title = document.getElementById('noteTitleInput').value.trim();
+  const body = document.getElementById('noteBodyInput').value.trim();
+  if(!title && !body){ toast('Write something first'); return; }
+  if(activeNoteId){
+    const n = state.notes.find(x=>x.id===activeNoteId);
+    n.title = title; n.body = body; n.updatedAt = Date.now();
+  } else {
+    activeNoteId = state.nextNoteId++;
+    state.notes.push({id: activeNoteId, title, body, updatedAt: Date.now()});
+  }
+  toast('Note saved');
+  renderNotesList();
+}
+function deleteCurrentNote(){
+  if(activeNoteId){
+    state.notes = state.notes.filter(n=>n.id!==activeNoteId);
+    toast('Note deleted');
+  }
+  closeNoteEditor();
+}
+function appendAiMsg(who, text){
+  const log = document.getElementById('aiChatLog');
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + (who==='you' ? 'me' : 'them');
+  msg.innerHTML = '<b>'+(who==='you'?'You':'AI Coach')+'</b>'+escapeHtml(text);
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+}
+async function scanNoteForDeadlines(){
+  if(!state.premiumActive) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  if(!body){ toast('Write some notes first'); return; }
+  appendAiMsg('ai', 'Scanning this note for deadlines…');
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const sys = 'You extract deadlines, due dates, and events from a student\'s notes. Today\'s date is '+today+'. Respond with ONLY strict JSON, no markdown fences, no other text: an array like [{"title":"...","date":"YYYY-MM-DD","note":"..."}]. If none, respond with [].';
+    const raw = await callClaudeJSON(body, sys);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const items = JSON.parse(clean);
+    if(!Array.isArray(items) || !items.length){
+      appendAiMsg('ai', 'I didn\'t find a clear deadline in there.');
+      return;
+    }
+    items.forEach(it=>{
+      if(it.title && it.date) state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note||'From your notes'});
+    });
+    renderCalendar();
+    appendAiMsg('ai', 'Added '+items.length+' deadline'+(items.length>1?'s':'')+' to your calendar: '+items.map(i=>i.title).join(', '));
+    toast('Calendar updated from your note');
+  } catch(err){
+    appendAiMsg('ai', 'Couldn\'t reach the AI service right now — you can still add deadlines manually on the Calendar tab.');
+  }
+}
+async function askAiAboutNote(){
+  if(!state.premiumActive) return;
+  const input = document.getElementById('aiAskInput');
+  const question = input.value.trim();
+  if(!question) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  appendAiMsg('you', question);
+  input.value='';
+  try{
+    const sys = 'You are a friendly, encouraging AI study coach for a student. Keep answers short (under 120 words), practical, and specific to their note below. If the note is empty, answer generally.\n\nSTUDENT NOTE:\n'+(body || '(empty)');
+    const raw = await callClaudeJSON(question, sys);
+    appendAiMsg('ai', raw.trim() || 'Hmm, I got an empty response — try asking again.');
+  } catch(err){
+    appendAiMsg('ai', 'Couldn\'t reach the AI service right now. Try again in a bit.');
+  }
+}
+
+/* ---------------- NAV ---------------- */
+const navbtns = document.querySelectorAll('.navbtn');
+const screens = document.querySelectorAll('.screen');
+const titles = {home:'Home', tasks:'Tasks', calendar:'Calendar', premium:'Premium', squad:'Squad', profile:'Profile', admin:'Admin'};
+navbtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(btn.dataset.tab === 'admin' && (!currentUserEmail || db[currentUserEmail].role !== 'admin')) return;
+    navbtns.forEach(b=>b.classList.remove('active'));
+    screens.forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector('.screen[data-screen="'+btn.dataset.tab+'"]').classList.add('active');
+    document.getElementById('pageTitle').textContent = titles[btn.dataset.tab];
+    document.querySelector('.screens').scrollTop = 0;
+    if(btn.dataset.tab === 'admin') renderAdmin();
+    if(btn.dataset.tab === 'squad') renderLeaderboard();
+    if(btn.dataset.tab === 'calendar'){ renderCalendar(); renderNotesList(); }
+  });
+});
+
+/* ---------------- TOAST ---------------- */
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 1800);
+}
+
+/* ---------------- STAT RENDER ---------------- */
+function renderStats(){
+  if(!state) return;
+  document.getElementById('coinCount').textContent = state.coins;
+  document.getElementById('streakCount').textContent = state.streak;
+  document.getElementById('levelNum').textContent = state.level;
+  document.getElementById('xpNum').textContent = state.xp;
+  document.getElementById('xpMaxNum').textContent = state.xpMax;
+  document.getElementById('xpBar').style.width = Math.min(100,(state.xp/state.xpMax)*100)+'%';
+  document.getElementById('profLevel').textContent = state.level;
+  document.getElementById('profStreak').textContent = state.streak;
+  const doneToday = state.tasks.filter(t=>t.subtasks.length && t.subtasks.every(s=>s.done)).length;
+  document.getElementById('greetSub').textContent = new Date().toLocaleDateString(undefined,{weekday:'long'}) + ' · ' + state.tasks.length + ' task' + (state.tasks.length===1?'':'s') + ' · ' + doneToday + ' done';
+}
+
+function pulseCoins(){
+  const el = document.querySelector('.pill.coin');
+  if(!el) return;
+  el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+}
+function addXp(amount){
+  state.xp += amount;
+  while(state.xp >= state.xpMax){ state.xp -= state.xpMax; state.level++; }
+  renderStats();
+}
+
+/* ---------------- RADAR ---------------- */
+const zoneAngle = {chill:-45, watch:0, cram:45};
+const zoneLabelTxt = {
+  chill:'Chill Zone — plenty of runway',
+  watch:'Watch Zone — starting today keeps you safe',
+  cram:'Cram Zone — this needs you now'
+};
+function worstZone(){
+  const order = {cram:2, watch:1, chill:0};
+  let worst = 'chill', worstTask = null;
+  state.tasks.forEach(t=>{
+    const remaining = t.subtasks.some(s=>!s.done);
+    if(remaining && order[t.zone] >= order[worst]){ worst = t.zone; worstTask = t; }
+  });
+  return {zone: worst, task: worstTask};
+}
+function renderRadar(){
+  const {zone, task} = worstZone();
+  document.getElementById('homeNeedle').style.transform = 'rotate('+zoneAngle[zone]+'deg)';
+  document.getElementById('radarLabel').textContent = zoneLabelTxt[zone];
+  document.getElementById('radarTaskName').textContent = task ? task.title : 'All caught up';
+}
+
+/* ---------------- CRAM ALERT (Gen-Z notification), now dynamic ---------------- */
+function renderCramAlert(){
+  const card = document.getElementById('gzCard');
+  const {zone, task} = worstZone();
+  if(zone === 'cram' && task){
+    const opts = [
+      'BRO... 💀<br>"' + task.title + '" has been sitting there.<br><br>You still have time — but not a lot.<br><br>Give it 15 minutes. Just start.',
+      'not to be dramatic but "' + task.title + '" is entering final boss territory. 🚨<br><br>Open it. Do one subtask. That\'s it, that\'s the ask.',
+      'the Cram Radar is not okay rn 📡<br><br>"' + task.title + '" needs you today, not tonight at 2am.'
+    ];
+    document.getElementById('gzText').innerHTML = opts[Math.floor(Math.random()*opts.length)];
+    card.style.display = 'block';
+  } else if(zone === 'watch' && task){
+    document.getElementById('gzText').innerHTML = 'lowkey good time to start "' + task.title + '" 👀<br><br>Watch Zone today = no Cram Zone later.';
+    card.style.display = 'block';
+  } else {
+    card.style.display = 'none';
+  }
+}
+
+/* ---------------- HOME TASK LIST ---------------- */
+function renderHomeList(){
+  const wrap = document.getElementById('homeTaskList');
+  wrap.innerHTML = '';
+  if(!state.tasks.length){
+    wrap.innerHTML = '<div class="empty-row">No tasks yet — add one from the Tasks tab.</div>';
+    return;
+  }
+  state.tasks.forEach(t=>{
+    const done = t.subtasks.length>0 && t.subtasks.every(s=>s.done);
+    const doneCount = t.subtasks.filter(s=>s.done).length;
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    row.innerHTML = `
+      <button class="check ${done?'done':''}" onclick="quickToggle(${t.id})"></button>
+      <div class="tt">
+        <strong class="${done?'done-txt':''}">${escapeHtml(t.title)}</strong>
+        <span>${done ? 'Completed' : doneCount+' of '+t.subtasks.length+' steps done'}</span>
+      </div>
+      <div class="zone ${t.zone}">${t.zone==='chill'?'Chill':t.zone==='watch'?'Watch':'Cram'}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+function quickToggle(id){
+  const t = state.tasks.find(x=>x.id===id);
+  const allDone = t.subtasks.every(s=>s.done);
+  if(!allDone){
+    t.subtasks.forEach(s=>s.done=true);
+    state.coins += 20; addXp(15);
+    pulseCoins();
+    toast('Task complete! +20 coins · +15 XP');
+  } else {
+    t.subtasks.forEach(s=>s.done=false);
+  }
+  renderHomeList(); renderTasksScreen(); renderRadar(); renderStats(); renderCramAlert();
+}
+
+/* ---------------- TASKS SCREEN ---------------- */
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+function renderTasksScreen(){
+  const wrap = document.getElementById('taskCards');
+  wrap.innerHTML = '';
+  if(!state.tasks.length){
+    wrap.innerHTML = '<div class="empty-row">Nothing here yet. Add your first requirement below.</div>';
+    return;
+  }
+  state.tasks.forEach(t=>{
+    const doneCount = t.subtasks.filter(s=>s.done).length;
+    const pct = t.subtasks.length ? Math.round((doneCount/t.subtasks.length)*100) : 0;
+    const complete = pct===100;
+    if(complete && !t.celebrated){ t.celebrated = true; }
+    const circumference = 2*Math.PI*15;
+    const dash = (pct/100)*circumference;
+
+    const card = document.createElement('div');
+    card.className = 'task-card' + (openTaskId===t.id ? ' open' : '') + (complete ? ' complete' : '');
+    card.innerHTML = `
+      <div class="task-card-head" onclick="toggleCard(${t.id})">
+        <div class="ring">
+          <svg width="38" height="38" viewBox="0 0 38 38">
+            <circle cx="19" cy="19" r="15" fill="none" stroke="var(--line)" stroke-width="4"/>
+            <circle cx="19" cy="19" r="15" fill="none" stroke="var(--mint)" stroke-width="4"
+              stroke-dasharray="${dash} ${circumference}" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-pct">${pct}%</div>
+        </div>
+        <div class="info">
+          <h4>${escapeHtml(t.title)}</h4>
+          <div class="meta">${escapeHtml(t.due)} · ${doneCount}/${t.subtasks.length} steps</div>
+        </div>
+        <span class="zone ${t.zone}">${t.zone==='chill'?'Chill':t.zone==='watch'?'Watch':'Cram'}</span>
+        <span class="chevron">▸</span>
+      </div>
+      <div class="task-card-body">
+        ${t.subtasks.map((s,i)=>`
+          <div class="sub-row">
+            <button class="check ${s.done?'done':''}" onclick="toggleSub(${t.id},${i})"></button>
+            <span class="${s.done?'done-txt':''}" style="${s.done?'color:var(--text-soft); text-decoration:line-through;':''}">${escapeHtml(s.t)}</span>
+            <button class="sub-del" title="Remove step" onclick="removeSub(${t.id},${i})">✕</button>
+          </div>`).join('')}
+        <div class="add-sub-row">
+          <input type="text" placeholder="Add a step…" id="newSub-${t.id}" onkeydown="if(event.key==='Enter') addSub(${t.id})">
+          <button class="btn btn-ghost btn-sm" onclick="addSub(${t.id})">Add</button>
+        </div>
+        <div class="celebrate">🎉 Finished ahead of schedule — +50 coins, no cram zone.</div>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+}
+function toggleCard(id){
+  openTaskId = (openTaskId===id) ? null : id;
+  renderTasksScreen();
+}
+function toggleSub(taskId, idx){
+  const t = state.tasks.find(x=>x.id===taskId);
+  const wasComplete = t.subtasks.every(s=>s.done);
+  t.subtasks[idx].done = !t.subtasks[idx].done;
+  const isComplete = t.subtasks.every(s=>s.done);
+  if(isComplete && !wasComplete){
+    state.coins += 50; addXp(30);
+    pulseCoins();
+    const headEl = document.querySelector('.task-card.open .task-card-head');
+    confettiBurst(headEl);
+    toast('Task complete! +50 coins · +30 XP');
+  }
+  openTaskId = taskId;
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderStats(); renderCramAlert();
+}
+function removeSub(taskId, idx){
+  const t = state.tasks.find(x=>x.id===taskId);
+  t.subtasks.splice(idx,1);
+  openTaskId = taskId;
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+}
+function addSub(taskId){
+  const input = document.getElementById('newSub-'+taskId);
+  const val = input.value.trim();
+  if(!val) return;
+  const t = state.tasks.find(x=>x.id===taskId);
+  t.subtasks.push({t:val, done:false});
+  openTaskId = taskId;
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+}
+function toggleAddForm(){
+  document.getElementById('addForm').classList.toggle('show');
+}
+function addTask(){
+  const title = document.getElementById('newTaskTitle').value.trim();
+  const due = document.getElementById('newTaskDue').value.trim();
+  const zone = document.getElementById('newTaskZone').value;
+  if(!title) { toast('Give the task a title first'); return; }
+  state.tasks.unshift({
+    id: state.nextTaskId++, title, due: due || 'no date set', zone,
+    subtasks: [{t:'Get started', done:false}], celebrated:false
+  });
+  document.getElementById('newTaskTitle').value='';
+  document.getElementById('newTaskDue').value='';
+  document.getElementById('addForm').classList.remove('show');
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  toast('Task added');
+}
+
+/* ---------------- PREMIUM ---------------- */
+function renderPips(){
+  const wrap = document.getElementById('pips');
+  wrap.innerHTML='';
+  for(let i=1;i<=7;i++){
+    const p = document.createElement('div');
+    p.className = 'pip' + (i<=state.lockInDay ? ' on' : '');
+    p.textContent = i;
+    wrap.appendChild(p);
+  }
+  const card = document.getElementById('lockinCard');
+  const btn = document.getElementById('checkinBtn');
+  if(state.lockInDay >= 7){
+    card.classList.add('unlocked');
+    if(!state.premiumActive){ grantPremium('via 7-Day Lock-In'); }
+  } else {
+    card.classList.remove('unlocked');
+    btn.textContent = 'Check in today (day '+(state.lockInDay+1)+' of 7)';
+  }
+}
+function checkIn(){
+  if(state.lockInDay >= 7) return;
+  state.lockInDay++;
+  if(state.lockInDay === 7){
+    state.coins += 500;
+    pulseCoins();
+    confettiBurst(document.getElementById('lockinCard'));
+    toast('7-Day Lock-In complete! +500 coins');
+  } else {
+    toast('Day '+state.lockInDay+' locked in 🔥');
+  }
+  renderPips(); renderStats(); renderPremiumBanner();
+}
+function redeemPremium(){
+  const cost = 1000;
+  if(state.premiumActive){ toast('Premium is already active'); return; }
+  if(state.coins < cost){ toast('Not enough coins — need '+cost+' 🪙'); return; }
+  state.coins -= cost;
+  grantPremium('via coin redemption');
+  confettiBurst(document.querySelector('.redeem-card'));
+  toast('Premium unlocked for 1000 🪙!');
+  renderStats();
+}
+function grantPremium(label){
+  state.premiumActive = true;
+  state.premiumLabel = label;
+  setPerks(true);
+  renderPremiumBanner();
+}
+function revokePremium(){
+  state.premiumActive = false;
+  state.premiumLabel = '';
+  state.shieldOn = false;
+  setPerks(false);
+  renderPremiumBanner();
+  document.getElementById('shieldToggle').classList.remove('on');
+}
+function renderPremiumBanner(){
+  const banner = document.getElementById('premBanner');
+  banner.classList.toggle('show', !!state.premiumActive);
+  document.getElementById('premBannerLabel').textContent = state.premiumLabel || 'Premium';
+  document.getElementById('customizeLockNote').style.display = state.premiumActive ? 'none' : 'block';
+}
+function setPerks(active){
+  for(let i=1;i<=5;i++){
+    const el = document.getElementById('perk-'+i);
+    el.textContent = active ? 'Active' : 'Locked';
+    el.className = 'perk-status ' + (active?'active':'locked');
+  }
+}
+function toggleShield(){
+  if(!state.premiumActive){ toast('Unlock Premium to enable Streak Shield'); return; }
+  state.shieldOn = !state.shieldOn;
+  document.getElementById('shieldToggle').classList.toggle('on', state.shieldOn);
+  toast(state.shieldOn ? 'Streak Shield armed 🛡️' : 'Streak Shield turned off');
+}
+
+/* ---------------- SQUAD CHAT ---------------- */
+function sendChat(){
+  const input = document.getElementById('chatInput');
+  const val = input.value.trim();
+  if(!val) return;
+  const log = document.getElementById('chatLog');
+  const msg = document.createElement('div');
+  msg.className = 'msg me';
+  msg.innerHTML = '<b>You</b>'+escapeHtml(val);
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+  input.value='';
+}
+document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+/* ---------------- LEADERBOARD ---------------- */
+function renderLeaderboard(){
+  const wrap = document.getElementById('leaderboardCard');
+  if(!wrap) return;
+  const real = Object.values(db).filter(u=>u.role!=='admin').map(u=>({
+    name: u.name + (u.email===currentUserEmail ? ' (You)' : ''),
+    xp: (u.state.level-1)*u.state.xpMax + u.state.xp,
+    streak: u.state.streak,
+    initials: u.state.initials,
+    bg: 'var(--coral)',
+    isYou: u.email===currentUserEmail
+  }));
+  const all = [...npcClassmates.map(n=>({...n})), ...real].sort((a,b)=>b.xp-a.xp);
+  wrap.innerHTML = all.map((p,i)=>`
+    <div class="lb-row ${p.isYou?'you':''}">
+      <div class="lb-rank">${i+1}</div>
+      <div class="avatar" style="background:${p.bg};">${p.initials}</div>
+      <div class="lb-name"><strong>${escapeHtml(p.name)}</strong><span>${p.streak}-day streak</span></div>
+      <div class="lb-xp">${p.xp.toLocaleString()} XP</div>
+    </div>
+  `).join('');
+}
+function renderTitlesRow(){
+  const wrap = document.getElementById('titlesBadgeRow');
+  if(!wrap || !state) return;
+  const earned = ['🌱 Newcomer'];
+  if(state.level >= 3) earned.push('🌅 Early Bird');
+  if(state.streak >= 5) earned.push('🚫 No-Cram Streak');
+  if(state.lockInDay > 0 && state.lockInDay < 7) earned.push('🔁 Comeback Kid');
+  wrap.innerHTML = earned.map(t=>`<span class="badge">${t}</span>`).join('');
+}
+
+/* ---------------- PROFILE ---------------- */
+function setTheme(el){
+  document.querySelectorAll('.swatch').forEach((s,i)=>{
+    s.classList.remove('selected');
+    if(s===el) state.swatchIndex = i;
+  });
+  el.classList.add('selected');
+  state.accentC1 = el.dataset.c1;
+  state.accentC2 = el.dataset.c2;
+  document.documentElement.style.setProperty('--accent', el.dataset.c1);
+  document.documentElement.style.setProperty('--accent-2', el.dataset.c2);
+}
+function setTitle(el, text){
+  document.querySelectorAll('.title-pick .badge').forEach((b,i)=>{
+    b.classList.remove('selected');
+    if(b===el) state.titleIndex = i;
+  });
+  el.classList.add('selected');
+  state.titleBadge = text;
+  document.getElementById('titleBadge').textContent = text;
+}
+
+/* ---------------- ADMIN ---------------- */
+function renderAdmin(){
+  const listEl = document.getElementById('adminUserList');
+  if(!listEl) return;
+  const users = Object.values(db);
+  document.getElementById('admStatUsers').textContent = users.length;
+  document.getElementById('admStatPremium').textContent = users.filter(u=>u.state.premiumActive).length;
+  document.getElementById('admStatCoins').textContent = users.reduce((sum,u)=>sum+u.state.coins,0).toLocaleString();
+
+  listEl.innerHTML = users.map(u=>`
+    <div class="user-row">
+      <div class="urow-top">
+        <div class="avatar" style="background:var(--violet);">${u.state.initials}</div>
+        <div class="uinfo"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>
+        <div class="tag-row">
+          <span class="role-tag ${u.role==='admin'?'admin':''}">${u.role}</span>
+          ${u.state.premiumActive ? '<span class="prem-tag">Premium</span>' : ''}
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Lv ${u.state.level} · ${u.state.coins}🪙 · ${u.state.streak}🔥 streak</div>
+      <div class="uactions">
+        ${u.state.premiumActive
+          ? `<button class="btn btn-ghost btn-sm" onclick="adminRevoke('${u.email}')">Revoke premium</button>`
+          : `<button class="btn btn-ghost btn-sm" onclick="adminGrant('${u.email}')">Grant 7-day premium</button>`}
+        ${u.role!=='admin' ? `<button class="btn btn-danger btn-sm" onclick="adminDelete('${u.email}')">Delete account</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+function adminGrant(email){
+  if(!db[email]) return;
+  db[email].state.premiumActive = true;
+  db[email].state.premiumLabel = 'via admin grant';
+  toast('Premium granted to ' + db[email].name);
+  renderAdmin();
+  if(email===currentUserEmail){ setPerks(true); renderPremiumBanner(); }
+}
+function adminRevoke(email){
+  if(!db[email]) return;
+  db[email].state.premiumActive = false;
+  db[email].state.premiumLabel = '';
+  db[email].state.shieldOn = false;
+  toast('Premium revoked for ' + db[email].name);
+  renderAdmin();
+  if(email===currentUserEmail){ setPerks(false); renderPremiumBanner(); document.getElementById('shieldToggle').classList.remove('on'); }
+}
+function adminDelete(email){
+  if(!db[email] || db[email].role==='admin') return;
+  const name = db[email].name;
+  delete db[email];
+  toast('Deleted account: ' + name);
+  renderAdmin();
+  if(email===currentUserEmail){ doLogout(); }
+}
+
+/* ---------------- INIT ---------------- */
+switchAuthTab('login');
+</script>
+
+</body>
+</html>
