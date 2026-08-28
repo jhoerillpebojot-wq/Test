@@ -752,10 +752,20 @@ function hashPass(p){
 }
 function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 function genCode(){ return String(Math.floor(100000 + Math.random()*900000)); }
+// Formats a Date as YYYY-MM-DD using its LOCAL date parts (not UTC).
+// toISOString() converts to UTC first, which silently rolls the date
+// back a day for anyone in a timezone ahead of UTC (e.g. UTC+8) —
+// this avoids that bug.
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function isoInDays(n){
   const d = new Date();
   d.setDate(d.getDate()+n);
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 function initialsOf(name){
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -1028,7 +1038,7 @@ function dateFromMatch(m){
   let year = now.getFullYear();
   let candidate = new Date(year, monthIdx, day);
   if(candidate < now) candidate = new Date(year+1, monthIdx, day);
-  return candidate.toISOString().slice(0,10);
+  return toLocalISO(candidate);
 }
 function localDateParse(text){
   DATE_RE.lastIndex = 0;
@@ -1092,7 +1102,7 @@ function renderCalendar(){
   const first = new Date(y,m,1);
   const startOffset = first.getDay();
   const daysInMonth = new Date(y,m+1,0).getDate();
-  const todayIso = new Date().toISOString().slice(0,10);
+  const todayIso = toLocalISO(new Date());
   const evByDate = {};
   state.events.forEach(e=>{ (evByDate[e.date] = evByDate[e.date]||[]).push(e); });
 
