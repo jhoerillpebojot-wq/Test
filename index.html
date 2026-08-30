@@ -549,12 +549,12 @@
       <!-- CALENDAR SUB-TAB -->
       <div class="calsub active" id="calsub-cal">
         <div class="ai-quickadd">
-          <div class="aq-title">✨ Quick-add a deadline</div>
+          <div class="aq-title">✨ Tell AI about a deadline</div>
           <div class="ai-input-row">
             <input type="text" id="quickAddInput" placeholder='e.g. "I have a deadline in October 27"' onkeydown="if(event.key==='Enter') quickAddDeadline()">
-            <button onclick="quickAddDeadline()" title="Add to calendar">➤</button>
+            <button onclick="quickAddDeadline()" title="Add with AI">➤</button>
           </div>
-          <div class="aq-hint" id="quickAddHint">Premium feature — type a sentence with a month and day, it'll turn it into a calendar entry.</div>
+          <div class="aq-hint" id="quickAddHint">Premium feature — turns a sentence into a real calendar entry.</div>
         </div>
 
         <div class="cal-head">
@@ -595,13 +595,17 @@
           </div>
 
           <div class="ai-panel" id="aiPanelUnlocked" style="display:none;">
-            <div class="ai-label">🔎 Deadline Scanner</div>
+            <div class="ai-label">🧠 AI Study Coach</div>
             <button class="btn btn-ghost btn-block" style="margin-bottom:10px;" onclick="scanNoteForDeadlines()">Scan this note for deadlines</button>
             <div class="ai-chat-log" id="aiChatLog"></div>
+            <div class="ai-input-row" style="display:flex; gap:8px;">
+              <input type="text" id="aiAskInput" placeholder="Ask about this note…" style="flex:1; padding:10px 12px; border-radius:100px; border:1px solid var(--line); background:var(--fog); font-size:12.5px;" onkeydown="if(event.key==='Enter') askAiAboutNote()">
+              <button class="btn btn-dark" onclick="askAiAboutNote()">Ask</button>
+            </div>
           </div>
           <div class="ai-lock" id="aiPanelLocked">
             <div class="lock-ic">🔒</div>
-            <p>Deadline Scanner — automatically pulls dates out of your notes — is a Premium perk.</p>
+            <p>AI Study Coach — summaries, Q&amp;A, and automatic deadline detection — is a Premium perk.</p>
             <button class="btn btn-primary" onclick="goToPremium()">Unlock Premium</button>
           </div>
         </div>
@@ -641,7 +645,7 @@
       </div>
 
       <div class="section-label">Premium perks</div>
-      <div class="perk-row"><div class="ic">🔎</div><div><strong>Deadline Scanner</strong><span>Pulls dates out of your notes automatically</span></div><div class="perk-status locked" id="perk-1">Locked</div></div>
+      <div class="perk-row"><div class="ic">🧠</div><div><strong>AI Study Coach</strong><span>Personalized help, when it applies</span></div><div class="perk-status locked" id="perk-1">Locked</div></div>
       <div class="perk-row"><div class="ic">📊</div><div><strong>Advanced Analytics</strong><span>Progress reports over time</span></div><div class="perk-status locked" id="perk-2">Locked</div></div>
       <div class="perk-row"><div class="ic">🎨</div><div><strong>Premium Customization</strong><span>Make your profile yours</span></div><div class="perk-status locked" id="perk-3">Locked</div></div>
       <div class="perk-row"><div class="ic">🛡️</div><div><strong>Streak Shield</strong><span>Protects one missed day</span></div><div class="perk-status locked" id="perk-4">Locked</div></div>
@@ -752,20 +756,10 @@ function hashPass(p){
 }
 function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 function genCode(){ return String(Math.floor(100000 + Math.random()*900000)); }
-// Formats a Date as YYYY-MM-DD using its LOCAL date parts (not UTC).
-// toISOString() converts to UTC first, which silently rolls the date
-// back a day for anyone in a timezone ahead of UTC (e.g. UTC+8) —
-// this avoids that bug.
-function toLocalISO(d){
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return y+'-'+m+'-'+day;
-}
 function isoInDays(n){
   const d = new Date();
   d.setDate(d.getDate()+n);
-  return toLocalISO(d);
+  return d.toISOString().slice(0,10);
 }
 function initialsOf(name){
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -1024,46 +1018,39 @@ function confettiBurst(originEl){
   }
 }
 
-/* ---------------- DEADLINE PARSING (local only — no API calls, no
-   server, no cost. Understands literal "Month Day" phrasing, e.g.
-   "October 27" or "Dec 15th". Doesn't understand relative phrasing
-   like "next Friday".) ---------------- */
-const MONTHS_MAP = {january:0,jan:0,february:1,feb:1,march:2,mar:2,april:3,apr:3,may:4,june:5,jun:5,
-  july:6,jul:6,august:7,aug:7,september:8,sep:8,sept:8,october:9,oct:9,november:10,nov:10,december:11,dec:11};
-const DATE_RE = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi;
-function dateFromMatch(m){
-  const monthIdx = MONTHS_MAP[m[1].toLowerCase()];
+/* ---------------- AI (real Claude API call — works when this file is
+   running as a Claude.ai artifact; if it can't reach the API — e.g. the
+   file was saved and opened outside Claude.ai — a lightweight local
+   date-parser fallback kicks in so the feature still works, just less
+   smart) ---------------- */
+async function callClaudeJSON(userPrompt, systemPrompt){
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role:'user', content:userPrompt }]
+    })
+  });
+  const data = await response.json();
+  const text = (data.content || []).map(b=>b.text||'').join('\n');
+  return text;
+}
+function localDateParse(text){
+  const months = {january:0,jan:0,february:1,feb:1,march:2,mar:2,april:3,apr:3,may:4,june:5,jun:5,
+    july:6,jul:6,august:7,aug:7,september:8,sep:8,sept:8,october:9,oct:9,november:10,nov:10,december:11,dec:11};
+  const re = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i;
+  const m = text.match(re);
+  if(!m) return null;
+  const monthIdx = months[m[1].toLowerCase()];
   const day = parseInt(m[2],10);
   const now = new Date();
   let year = now.getFullYear();
   let candidate = new Date(year, monthIdx, day);
   if(candidate < now) candidate = new Date(year+1, monthIdx, day);
-  return toLocalISO(candidate);
-}
-function localDateParse(text){
-  DATE_RE.lastIndex = 0;
-  const m = DATE_RE.exec(text);
-  if(!m) return null;
-  return dateFromMatch(m);
-}
-// Scans a longer block of text (e.g. a note) sentence-by-sentence and
-// returns one {title, date, note} entry per sentence that contains a
-// recognizable date.
-function extractAllDates(text){
-  const sentences = text.split(/(?<=[.!?\n])\s+/).map(s=>s.trim()).filter(Boolean);
-  const results = [];
-  sentences.forEach(sentence=>{
-    DATE_RE.lastIndex = 0;
-    const m = DATE_RE.exec(sentence);
-    if(m){
-      results.push({
-        title: sentence.length>40 ? sentence.slice(0,40)+'…' : sentence,
-        date: dateFromMatch(m),
-        note: 'From your notes'
-      });
-    }
-  });
-  return results;
+  return candidate.toISOString().slice(0,10);
 }
 
 /* ---------------- CALENDAR & NOTES sub-tabs ---------------- */
@@ -1102,7 +1089,7 @@ function renderCalendar(){
   const first = new Date(y,m,1);
   const startOffset = first.getDay();
   const daysInMonth = new Date(y,m+1,0).getDate();
-  const todayIso = toLocalISO(new Date());
+  const todayIso = new Date().toISOString().slice(0,10);
   const evByDate = {};
   state.events.forEach(e=>{ (evByDate[e.date] = evByDate[e.date]||[]).push(e); });
 
@@ -1155,22 +1142,39 @@ function deleteEvent(id){
   state.events = state.events.filter(e=>e.id!==id);
   renderCalendar();
 }
-function quickAddDeadline(){
-  if(!state.premiumActive){ toast('Unlock Premium to use quick-add'); return; }
+async function quickAddDeadline(){
+  if(!state.premiumActive){ toast('Unlock Premium to use AI deadline detection'); return; }
   const input = document.getElementById('quickAddInput');
   const text = input.value.trim();
   if(!text){ toast('Type a sentence first, e.g. "deadline in October 27"'); return; }
   const hint = document.getElementById('quickAddHint');
-  const iso = localDateParse(text);
-  if(iso){
-    state.events.push({id: state.nextEventId++, title: text.length>40?text.slice(0,40)+'…':text, date: iso, note:''});
-    hint.textContent = 'Premium feature — type a sentence with a month and day, it\'ll turn it into a calendar entry.';
+  hint.textContent = 'AI is reading that…';
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const sys = 'You extract deadlines from a student\'s casual message. Today\'s date is '+today+'. Respond with ONLY strict JSON, no other text, no markdown fences, in this exact shape: {"title":"short label for the deadline","date":"YYYY-MM-DD","note":""}. If the year is not stated, infer the nearest future occurrence of that date. If no deadline is mentioned, respond with {"title":null}.';
+    const raw = await callClaudeJSON(text, sys);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    if(!parsed.title || !parsed.date) throw new Error('no-deadline');
+    state.events.push({id: state.nextEventId++, title: parsed.title, date: parsed.date, note: parsed.note||''});
+    hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
     input.value='';
     renderCalendar();
-    toast('Added "'+text.slice(0,40)+'" on '+fmtEvDate(iso));
-  } else {
-    hint.textContent = 'Couldn\'t find a date in that — try including a month and day, e.g. "October 27".';
-    toast('No date detected');
+    toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
+  } catch(err){
+    // fall back to a simple local parser so the feature still works
+    // even if the live AI call can't be reached from this environment
+    const iso = localDateParse(text);
+    if(iso){
+      state.events.push({id: state.nextEventId++, title: text.length>40?text.slice(0,40)+'…':text, date: iso, note:'Added via quick-parse (AI unreachable)'});
+      hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
+      input.value='';
+      renderCalendar();
+      toast('Added via quick-parse — AI call failed');
+    } else {
+      hint.textContent = 'Couldn\'t find a date in that — try including a month and day.';
+      toast('No date detected');
+    }
   }
 }
 
@@ -1243,26 +1247,50 @@ function appendAiMsg(who, text){
   const log = document.getElementById('aiChatLog');
   const msg = document.createElement('div');
   msg.className = 'msg ' + (who==='you' ? 'me' : 'them');
-  msg.innerHTML = '<b>'+(who==='you'?'You':'Scanner')+'</b>'+escapeHtml(text);
+  msg.innerHTML = '<b>'+(who==='you'?'You':'AI Coach')+'</b>'+escapeHtml(text);
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
 }
-function scanNoteForDeadlines(){
+async function scanNoteForDeadlines(){
   if(!state.premiumActive) return;
   const body = document.getElementById('noteBodyInput').value.trim();
   if(!body){ toast('Write some notes first'); return; }
   appendAiMsg('ai', 'Scanning this note for deadlines…');
-  const items = extractAllDates(body);
-  if(!items.length){
-    appendAiMsg('ai', 'I didn\'t find a clear date in there — try including a month and day, e.g. "October 27".');
-    return;
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const sys = 'You extract deadlines, due dates, and events from a student\'s notes. Today\'s date is '+today+'. Respond with ONLY strict JSON, no markdown fences, no other text: an array like [{"title":"...","date":"YYYY-MM-DD","note":"..."}]. If none, respond with [].';
+    const raw = await callClaudeJSON(body, sys);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const items = JSON.parse(clean);
+    if(!Array.isArray(items) || !items.length){
+      appendAiMsg('ai', 'I didn\'t find a clear deadline in there.');
+      return;
+    }
+    items.forEach(it=>{
+      if(it.title && it.date) state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note||'From your notes'});
+    });
+    renderCalendar();
+    appendAiMsg('ai', 'Added '+items.length+' deadline'+(items.length>1?'s':'')+' to your calendar: '+items.map(i=>i.title).join(', '));
+    toast('Calendar updated from your note');
+  } catch(err){
+    appendAiMsg('ai', 'Couldn\'t reach the AI service right now — you can still add deadlines manually on the Calendar tab.');
   }
-  items.forEach(it=>{
-    state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note});
-  });
-  renderCalendar();
-  appendAiMsg('ai', 'Added '+items.length+' deadline'+(items.length>1?'s':'')+' to your calendar: '+items.map(i=>i.title).join(', '));
-  toast('Calendar updated from your note');
+}
+async function askAiAboutNote(){
+  if(!state.premiumActive) return;
+  const input = document.getElementById('aiAskInput');
+  const question = input.value.trim();
+  if(!question) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  appendAiMsg('you', question);
+  input.value='';
+  try{
+    const sys = 'You are a friendly, encouraging AI study coach for a student. Keep answers short (under 120 words), practical, and specific to their note below. If the note is empty, answer generally.\n\nSTUDENT NOTE:\n'+(body || '(empty)');
+    const raw = await callClaudeJSON(question, sys);
+    appendAiMsg('ai', raw.trim() || 'Hmm, I got an empty response — try asking again.');
+  } catch(err){
+    appendAiMsg('ai', 'Couldn\'t reach the AI service right now. Try again in a bit.');
+  }
 }
 
 /* ---------------- NAV ---------------- */
@@ -1588,17 +1616,43 @@ function toggleShield(){
 }
 
 /* ---------------- SQUAD CHAT ---------------- */
+async function askCoach(message){
+  try {
+    const res = await fetch('/api/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+    return data.reply || "Coach didn't respond.";
+  } catch (err) {
+    return "Couldn't reach the coach right now.";
+  }
+}
+
 function sendChat(){
   const input = document.getElementById('chatInput');
   const val = input.value.trim();
   if(!val) return;
   const log = document.getElementById('chatLog');
+
   const msg = document.createElement('div');
   msg.className = 'msg me';
   msg.innerHTML = '<b>You</b>'+escapeHtml(val);
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
   input.value='';
+
+  const thinking = document.createElement('div');
+  thinking.className = 'msg coach';
+  thinking.innerHTML = '<b>Coach</b>Thinking…';
+  log.appendChild(thinking);
+  log.scrollTop = log.scrollHeight;
+
+  askCoach(val).then(reply => {
+    thinking.innerHTML = '<b>Coach</b>' + escapeHtml(reply);
+    log.scrollTop = log.scrollHeight;
+  });
 }
 document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
 
