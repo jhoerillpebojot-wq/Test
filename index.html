@@ -1023,20 +1023,26 @@ function confettiBurst(originEl){
    file was saved and opened outside Claude.ai — a lightweight local
    date-parser fallback kicks in so the feature still works, just less
    smart) ---------------- */
-async function callClaudeJSON(userPrompt, systemPrompt){
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+async function callGemini(userPrompt, systemPrompt) {
+  const response = await fetch("/api/gemini", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role:'user', content:userPrompt }]
+      prompt: userPrompt,
+      systemPrompt: systemPrompt
     })
   });
+
   const data = await response.json();
-  const text = (data.content || []).map(b=>b.text||'').join('\n');
-  return text;
+
+  if (!response.ok) {
+    console.error("AI error:", data);
+    throw new Error(data.error || "AI request failed");
+  }
+
+  return data.text || "";
 }
 function localDateParse(text){
   const months = {january:0,jan:0,february:1,feb:1,march:2,mar:2,april:3,apr:3,may:4,june:5,jun:5,
@@ -1152,7 +1158,7 @@ async function quickAddDeadline(){
   try{
     const today = new Date().toISOString().slice(0,10);
     const sys = 'You extract deadlines from a student\'s casual message. Today\'s date is '+today+'. Respond with ONLY strict JSON, no other text, no markdown fences, in this exact shape: {"title":"short label for the deadline","date":"YYYY-MM-DD","note":""}. If the year is not stated, infer the nearest future occurrence of that date. If no deadline is mentioned, respond with {"title":null}.';
-    const raw = await callClaudeJSON(text, sys);
+    const raw = await callGemini(text, sys);
     const clean = raw.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
     if(!parsed.title || !parsed.date) throw new Error('no-deadline');
@@ -1286,7 +1292,7 @@ async function askAiAboutNote(){
   input.value='';
   try{
     const sys = 'You are a friendly, encouraging AI study coach for a student. Keep answers short (under 120 words), practical, and specific to their note below. If the note is empty, answer generally.\n\nSTUDENT NOTE:\n'+(body || '(empty)');
-    const raw = await callClaudeJSON(question, sys);
+    const raw = await callGemini(question, sys);
     appendAiMsg('ai', raw.trim() || 'Hmm, I got an empty response — try asking again.');
   } catch(err){
     appendAiMsg('ai', 'Couldn\'t reach the AI service right now. Try again in a bit.');
