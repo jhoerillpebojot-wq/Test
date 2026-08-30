@@ -1024,6 +1024,7 @@ function confettiBurst(originEl){
    date-parser fallback kicks in so the feature still works, just less
    smart) ---------------- */
 async function callGemini(userPrompt, systemPrompt) {
+
   const response = await fetch("/api/gemini", {
     method: "POST",
 
@@ -1032,16 +1033,18 @@ async function callGemini(userPrompt, systemPrompt) {
     },
 
     body: JSON.stringify({
-      prompt: userPrompt,
-      systemPrompt: systemPrompt
+      prompt: systemPrompt
+        ? systemPrompt + "\n\n" + userPrompt
+        : userPrompt
     })
   });
 
   const data = await response.json();
 
+  console.log("OUR API RESPONSE:", data);
+
   if (!response.ok) {
-    console.error("AI API error:", data);
-    throw new Error(data.error || "AI request failed");
+    throw new Error(data.error || "Gemini request failed");
   }
 
   return data.text || "";
