@@ -1026,9 +1026,11 @@ function confettiBurst(originEl){
 async function callGemini(userPrompt, systemPrompt) {
   const response = await fetch("/api/gemini", {
     method: "POST",
+
     headers: {
       "Content-Type": "application/json"
     },
+
     body: JSON.stringify({
       prompt: userPrompt,
       systemPrompt: systemPrompt
@@ -1038,7 +1040,7 @@ async function callGemini(userPrompt, systemPrompt) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error("AI error:", data);
+    console.error("AI API error:", data);
     throw new Error(data.error || "AI request failed");
   }
 
@@ -1265,7 +1267,7 @@ async function scanNoteForDeadlines(){
   try{
     const today = new Date().toISOString().slice(0,10);
     const sys = 'You extract deadlines, due dates, and events from a student\'s notes. Today\'s date is '+today+'. Respond with ONLY strict JSON, no markdown fences, no other text: an array like [{"title":"...","date":"YYYY-MM-DD","note":"..."}]. If none, respond with [].';
-    const raw = await callClaudeJSON(body, sys);
+    const raw = await callGemini(body, sys);
     const clean = raw.replace(/```json|```/g,'').trim();
     const items = JSON.parse(clean);
     if(!Array.isArray(items) || !items.length){
