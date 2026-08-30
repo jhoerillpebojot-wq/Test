@@ -1173,20 +1173,28 @@ async function quickAddDeadline(){
     renderCalendar();
     toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
   } catch(err){
-    // fall back to a simple local parser so the feature still works
-    // even if the live AI call can't be reached from this environment
-    const iso = localDateParse(text);
-    if(iso){
-      state.events.push({id: state.nextEventId++, title: text.length>40?text.slice(0,40)+'…':text, date: iso, note:'Added via quick-parse (AI unreachable)'});
-      hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
-      input.value='';
-      renderCalendar();
-      toast('Added via quick-parse — AI call failed');
-    } else {
-      hint.textContent = 'Couldn\'t find a date in that — try including a month and day.';
-      toast('No date detected');
-    }
+  console.error("QUICK PARSE ERROR:", err);
+
+  const iso = localDateParse(text);
+
+  if(iso){
+    state.events.push({
+      id: state.nextEventId++,
+      title: text.length > 40 ? text.slice(0,40) + '…' : text,
+      date: iso,
+      note: 'Added via quick-parse (AI unreachable)'
+    });
+
+    hint.textContent = 'AI failed, so a local date parser was used.';
+    input.value = '';
+    renderCalendar();
+
+    toast('AI ERROR: ' + (err.message || 'Unknown error'));
+  } else {
+    hint.textContent = 'Couldn\'t find a date in that — try including a month and day.';
+    toast('No date detected');
   }
+}
 }
 
 /* ---------------- NOTES ---------------- */
