@@ -1,24 +1,29 @@
 export default async function handler(req, res) {
+  console.log("GEMINI FUNCTION CALLED");
+
   if (req.method !== "POST") {
     return res.status(405).json({
-      error: "Method not allowed"
+      error: "Method not allowed",
+      method: req.method
     });
   }
 
   try {
-    const { prompt, systemPrompt } = req.body || {};
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!prompt) {
-      return res.status(400).json({
-        error: "Missing prompt"
+    console.log("API KEY EXISTS:", !!apiKey);
+
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is missing from Vercel"
       });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is missing");
+    const { prompt } = req.body || {};
 
-      return res.status(500).json({
-        error: "GEMINI_API_KEY is not configured in Vercel"
+    if (!prompt) {
+      return res.status(400).json({
+        error: "No prompt received"
       });
     }
 
@@ -26,24 +31,13 @@ export default async function handler(req, res) {
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent",
       {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": process.env.GEMINI_API_KEY
+          "x-goog-api-key": apiKey
         },
-
         body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: systemPrompt || ""
-              }
-            ]
-          },
-
           contents: [
             {
-              role: "user",
               parts: [
                 {
                   text: prompt
@@ -57,15 +51,13 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    console.log("Gemini status:", response.status);
+    console.log("GEMINI STATUS:", response.status);
+    console.log("GEMINI RESPONSE:", JSON.stringify(data));
 
     if (!response.ok) {
-      console.error("Gemini API error:", data);
-
       return res.status(response.status).json({
-        error:
-          data?.error?.message ||
-          "Gemini API request failed"
+        error: data?.error?.message || "Gemini API error",
+        details: data
       });
     }
 
@@ -74,23 +66,15 @@ export default async function handler(req, res) {
         ?.map(part => part.text || "")
         .join("") || "";
 
-    if (!text) {
-      console.error("Gemini returned no text:", data);
-
-      return res.status(500).json({
-        error: "Gemini returned an empty response"
-      });
-    }
-
     return res.status(200).json({
       text
     });
 
   } catch (error) {
-    console.error("Gemini server error:", error);
+    console.error("SERVER ERROR:", error);
 
     return res.status(500).json({
-      error: error.message || "Internal server error"
+      error: error.message || "Server error"
     });
   }
 }
