@@ -1337,23 +1337,43 @@ function renderEventsList(){
     </div>
   `).join('');
 }
-function addEventManual(){
+async function addEventManual(){
   const title = document.getElementById('newEvTitle').value.trim();
   const date = document.getElementById('newEvDate').value;
   const note = document.getElementById('newEvNote').value.trim();
   if(!title || !date){ toast('Add a title and a date'); return; }
-  state.events.push({id: state.nextEventId++, title, date, note});
-  document.getElementById('newEvTitle').value='';
-  document.getElementById('newEvNote').value='';
-  bumpQuest('addEvent', 1);
-  renderCalendar();
-  persist();
-  toast('Added to calendar');
+  try{
+    const res = await fetch('/api/events', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'create', userId: currentUserId, title, date, note })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not add event'); return; }
+    state.events.push(data.event);
+    document.getElementById('newEvTitle').value='';
+    document.getElementById('newEvNote').value='';
+    bumpQuest('addEvent', 1);
+    renderCalendar();
+    toast('Added to calendar');
+  } catch(e){
+    console.error('ADD EVENT ERROR:', e);
+    toast('Could not reach the server');
+  }
 }
-function deleteEvent(id){
-  state.events = state.events.filter(e=>e.id!==id);
-  renderCalendar();
-  persist();
+async function deleteEvent(id){
+  try{
+    const res = await fetch('/api/events', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'delete', userId: currentUserId, eventId: id })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not delete event'); return; }
+    state.events = state.events.filter(e=>e.id!==id);
+    renderCalendar();
+  } catch(e){
+    console.error('DELETE EVENT ERROR:', e);
+    toast('Could not reach the server');
+  }
 }
 async function quickAddDeadline(){
   if(!state.premiumActive){ toast('Unlock Premium to use AI deadline detection'); return; }
@@ -1370,7 +1390,13 @@ async function quickAddDeadline(){
     const { text: raw } = await callGemini(text, sys);
     const parsed = extractJson(raw);
     if(!parsed || !parsed.title || !parsed.date) throw new Error('no-deadline');
-    state.events.push({id: state.nextEventId++, title: parsed.title, date: parsed.date, note: parsed.note||''});
+    const evRes = await fetch('/api/events', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'create', userId: currentUserId, title: parsed.title, date: parsed.date, note: parsed.note||'' })
+    });
+    const evData = await evRes.json();
+    if(!evRes.ok) throw new Error(evData.error || 'Could not save event');
+    state.events.push(evData.event);
     bumpQuest('addEvent', 1);
     hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
     input.value='';
@@ -1450,27 +1476,48 @@ function closeNoteEditor(){
   activeNoteId = null;
   renderNotesList();
 }
-function saveCurrentNote(){
+async function saveCurrentNote(){
   const title = document.getElementById('noteTitleInput').value.trim();
   const body = document.getElementById('noteBodyInput').value.trim();
   if(!title && !body){ toast('Write something first'); return; }
-  if(activeNoteId){
-    const n = state.notes.find(x=>x.id===activeNoteId);
-    n.title = title; n.body = body; n.updatedAt = Date.now();
-  } else {
-    activeNoteId = state.nextNoteId++;
-    state.notes.push({id: activeNoteId, title, body, updatedAt: Date.now()});
+  try{
+    const res = await fetch('/api/notes', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'save', userId: currentUserId, noteId: activeNoteId, title, body })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not save note'); return; }
+    if(activeNoteId){
+      const n = state.notes.find(x=>x.id===activeNoteId);
+      n.title = data.note.title; n.body = data.note.body; n.updatedAt = data.note.updatedAt;
+    } else {
+      activeNoteId = data.note.id;
+      state.notes.push(data.note);
+    }
+    bumpQuest('writeNote', 1);
+    toast('Note saved');
+    renderNotesList();
+  } catch(e){
+    console.error('SAVE NOTE ERROR:', e);
+    toast('Could not reach the server');
   }
-  bumpQuest('writeNote', 1);
-  toast('Note saved');
-  renderNotesList();
-  persist();
 }
-function deleteCurrentNote(){
+async function deleteCurrentNote(){
   if(activeNoteId){
-    state.notes = state.notes.filter(n=>n.id!==activeNoteId);
-    toast('Note deleted');
-    persist();
+    try{
+      const res = await fetch('/api/notes', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'delete', userId: currentUserId, noteId: activeNoteId })
+      });
+      const data = await res.json();
+      if(!res.ok){ toast(data.error || 'Could not delete note'); return; }
+      state.notes = state.notes.filter(n=>n.id!==activeNoteId);
+      toast('Note deleted');
+    } catch(e){
+      console.error('DELETE NOTE ERROR:', e);
+      toast('Could not reach the server');
+      return;
+    }
   }
   closeNoteEditor();
 }
