@@ -453,7 +453,7 @@
       <button class="link-btn" onclick="switchAuthTab('login')">Back to log in</button>
     </div>
 
-    <div class="auth-footnote">Prototype auth: accounts are kept in memory for this browser tab only and reset on reload. See the note at the end of chat for what a production build needs.</div>
+    <div class="auth-footnote">Prototype auth: accounts and progress are saved to this browser only (localStorage), not a real server. Clearing browser data or switching devices will lose them. See the note at the end of chat for what a production build needs.</div>
   </div>
 </div>
 
@@ -485,6 +485,9 @@
         <div class="xp-top"><span>Level <span id="levelNum">1</span></span><span><span id="xpNum">0</span> / <span id="xpMaxNum">500</span> XP</span></div>
         <div class="bar"><i id="xpBar" style="width:0%;"></i></div>
       </div>
+
+      <div class="section-label">Daily quests <span style="text-transform:none; font-weight:600; color:var(--text-soft);">· resets every day</span></div>
+      <div class="card" style="padding:4px 12px;" id="questList"></div>
 
       <div class="radar-card">
         <div class="rtitle"><strong>Cram Radar</strong><span id="radarTaskName">All caught up</span></div>
@@ -746,11 +749,12 @@
 /* =========================================================================
    PROACTA — prototype auth + points/premium logic
    -------------------------------------------------------------------------
-   Everything below runs entirely client-side, in memory. There is no
-   server, so "accounts" live in the `db` object for as long as this tab
-   stays open. Passwords are obfuscated (not real hashing) purely so the
-   plaintext isn't sitting in the object as you inspect it in devtools —
-   this is NOT secure and must not be treated as production auth.
+   Everything below runs entirely client-side. There is no real server for
+   accounts, so "accounts" live in the `db` object AND are mirrored to
+   localStorage so progress survives a reload on the same browser/device.
+   Passwords are obfuscated (not real hashing) purely so the plaintext
+   isn't sitting in the object as you inspect it in devtools — this is
+   NOT secure and must not be treated as production auth.
    ========================================================================= */
 
 /* ---------------- helpers ---------------- */
@@ -783,19 +787,79 @@ function initialsOf(name){
   return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
 }
 
+/* ---------------- daily quests ---------------- */
+const QUEST_DEFS = [
+  {id:'completeTask', icon:'✅', label:'Finish 1 task', target:1, coins:15, xp:10},
+  {id:'checkIn',       icon:'🔥', label:'Check in on the Premium tab', target:1, coins:10, xp:5},
+  {id:'addEvent',      icon:'🗓️', label:'Add a calendar deadline', target:1, coins:10, xp:5},
+  {id:'writeNote',     icon:'📝', label:'Save a note', target:1, coins:10, xp:5},
+  {id:'chatSquad',     icon:'💬', label:'Send a squad chat message', target:1, coins:5, xp:5}
+];
+function freshQuestState(){
+  const progress = {}, claimed = {};
+  QUEST_DEFS.forEach(q=>{ progress[q.id] = 0; claimed[q.id] = false; });
+  return { date: toLocalISO(), progress, claimed };
+}
+// Quests are per-calendar-day. Call this before reading/writing quest state
+// so a stale day's progress/claims never carry over or get claimed twice.
+function ensureQuestsFresh(){
+  if(!state) return;
+  const today = toLocalISO();
+  if(!state.quests || state.quests.date !== today){
+    state.quests = freshQuestState();
+  }
+}
+function bumpQuest(id, amount){
+  if(!state) return;
+  ensureQuestsFresh();
+  const def = QUEST_DEFS.find(q=>q.id===id);
+  if(!def) return;
+  state.quests.progress[id] = Math.min(def.target, (state.quests.progress[id]||0) + (amount||1));
+  renderQuests();
+}
+function claimQuest(id){
+  ensureQuestsFresh();
+  const def = QUEST_DEFS.find(q=>q.id===id);
+  if(!def) return;
+  const p = state.quests.progress[id]||0;
+  if(state.quests.claimed[id]){ toast('Already claimed today'); return; }
+  if(p < def.target){ toast('Not finished yet'); return; }
+  state.quests.claimed[id] = true;
+  state.coins += def.coins; addXp(def.xp);
+  pulseCoins();
+  toast('Quest complete! +'+def.coins+' coins · +'+def.xp+' XP');
+  renderQuests(); renderStats(); persist();
+}
+function renderQuests(){
+  const wrap = document.getElementById('questList');
+  if(!wrap || !state) return;
+  ensureQuestsFresh();
+  wrap.innerHTML = QUEST_DEFS.map(def=>{
+    const p = state.quests.progress[def.id]||0;
+    const done = p>=def.target;
+    const claimed = state.quests.claimed[def.id];
+    const statusTxt = claimed ? 'Claimed' : (done ? 'Ready to claim' : 'In progress');
+    return `<div class="task-row">
+      <div class="tt"><strong>${def.icon} ${escapeHtml(def.label)}</strong><span>${statusTxt} · +${def.coins}🪙 +${def.xp} XP</span></div>
+      <button class="btn ${(!claimed && done)?'btn-primary':'btn-ghost'} btn-sm" ${(!done||claimed)?'disabled':''} onclick="claimQuest('${def.id}')">${claimed?'Claimed':'Claim'}</button>
+    </div>`;
+  }).join('');
+}
+
 /* ---------------- default state for a new account ---------------- */
 function freshState(name){
   return {
     initials: initialsOf(name),
-    coins: 50, xp: 0, xpMax: 500, level: 1, streak: 0, lockInDay: 0,
+    coins: 50, xp: 0, xpMax: 500, level: 1, streak: 0, lockInDay: 0, lastCheckinDate: null,
     premiumActive: false, premiumLabel: '',
     shieldOn: false,
     accentC1: '#FF6B6B', accentC2: '#FFC857', swatchIndex: 0,
     titleBadge: '🌱 Newcomer', titleIndex: 0,
     nextTaskId: 2,
     darkMode: false,
+    quests: freshQuestState(),
     tasks: [
-      {id:1, title:'Try Proacta out', due:'today', zone:'chill',
+      {id:1, title:'Try Proacta out', due:'today', zone:'chill', rewarded:false,
         subtasks:[{t:'Add your first real task below', done:false}], celebrated:false}
     ],
     events: [],
@@ -806,58 +870,111 @@ function freshState(name){
 }
 
 /* ---------------- seed accounts ---------------- */
-let db = {
-  'admin@proacta.app': {
-    name:'Admin', email:'admin@proacta.app', role:'admin',
-    passHash: hashPass('Admin123!'),
-    state: (()=>{ const s = freshState('Admin'); s.coins = 9999; s.level = 10; s.streak = 40; return s; })()
-  },
-  'migs@proacta.app': {
-    name:'Migs', email:'migs@proacta.app', role:'student',
-    passHash: hashPass('Student123!'),
-    state: {
-      initials:'MI', coins:480, xp:320, xpMax:500, level:6, streak:12, lockInDay:3,
-      premiumActive:false, premiumLabel:'',
-      shieldOn:false, accentC1:'#FF6B6B', accentC2:'#FFC857', swatchIndex:0,
-      titleBadge:'🌅 Early Bird', titleIndex:1, nextTaskId:4, darkMode:false,
-      events:[
-        {id:1, title:'Stats Problem Set due', date: isoInDays(2), note:'Same deadline as the task list'},
-        {id:2, title:'Thesis Chapter 2 draft', date: isoInDays(6), note:''}
-      ], nextEventId:3,
-      notes:[
-        {id:1, title:'Stats formulas to remember', body:'Variance = average of squared deviations from the mean.\nStandard deviation = sqrt(variance).\n\nProf mentioned a pop quiz might happen before the problem set is due.', updatedAt: Date.now()}
-      ], nextNoteId:2,
-      tasks:[
-        {id:1, title:'Thesis Chapter 2', due:'6 days left', zone:'chill',
-          subtasks:[
-            {t:'Outline the chapter sections', done:true},
-            {t:'Gather 5 sources', done:true},
-            {t:'Draft the introduction', done:true},
-            {t:'Draft the body sections', done:false},
-            {t:'Add in-text citations', done:false},
-            {t:'Proofread & format', done:false}
-          ], celebrated:false},
-        {id:2, title:'Stats Problem Set', due:'2 days left', zone:'watch',
-          subtasks:[
-            {t:'Problems 1-5', done:false},
-            {t:'Problems 6-10', done:false},
-            {t:'Check answers', done:false}
-          ], celebrated:false},
-        {id:3, title:'Read Module 4', due:'due today', zone:'chill',
-          subtasks:[
-            {t:'Read pages 1-20', done:true},
-            {t:'Answer reflection questions', done:false}
-          ], celebrated:false}
-      ]
+function seedDb(){
+  return {
+    'admin@proacta.app': {
+      name:'Admin', email:'admin@proacta.app', role:'admin',
+      passHash: hashPass('Admin123!'),
+      state: (()=>{ const s = freshState('Admin'); s.coins = 9999; s.level = 10; s.streak = 40; return s; })()
+    },
+    'migs@proacta.app': {
+      name:'Migs', email:'migs@proacta.app', role:'student',
+      passHash: hashPass('Student123!'),
+      state: {
+        initials:'MI', coins:480, xp:320, xpMax:500, level:6, streak:12, lockInDay:3, lastCheckinDate:null,
+        premiumActive:false, premiumLabel:'',
+        shieldOn:false, accentC1:'#FF6B6B', accentC2:'#FFC857', swatchIndex:0,
+        titleBadge:'🌅 Early Bird', titleIndex:1, nextTaskId:4, darkMode:false,
+        quests: freshQuestState(),
+        events:[
+          {id:1, title:'Stats Problem Set due', date: isoInDays(2), note:'Same deadline as the task list'},
+          {id:2, title:'Thesis Chapter 2 draft', date: isoInDays(6), note:''}
+        ], nextEventId:3,
+        notes:[
+          {id:1, title:'Stats formulas to remember', body:'Variance = average of squared deviations from the mean.\nStandard deviation = sqrt(variance).\n\nProf mentioned a pop quiz might happen before the problem set is due.', updatedAt: Date.now()}
+        ], nextNoteId:2,
+        tasks:[
+          {id:1, title:'Thesis Chapter 2', due:'6 days left', zone:'chill', rewarded:false,
+            subtasks:[
+              {t:'Outline the chapter sections', done:true},
+              {t:'Gather 5 sources', done:true},
+              {t:'Draft the introduction', done:true},
+              {t:'Draft the body sections', done:false},
+              {t:'Add in-text citations', done:false},
+              {t:'Proofread & format', done:false}
+            ], celebrated:false},
+          {id:2, title:'Stats Problem Set', due:'2 days left', zone:'watch', rewarded:false,
+            subtasks:[
+              {t:'Problems 1-5', done:false},
+              {t:'Problems 6-10', done:false},
+              {t:'Check answers', done:false}
+            ], celebrated:false},
+          {id:3, title:'Read Module 4', due:'due today', zone:'chill', rewarded:false,
+            subtasks:[
+              {t:'Read pages 1-20', done:true},
+              {t:'Answer reflection questions', done:false}
+            ], celebrated:false}
+        ]
+      }
     }
-  }
-};
+  };
+}
 const npcClassmates = [
   {name:'Alex L.', xp:1240, streak:18, bg:'var(--gold)', initials:'AL'},
   {name:'Sam R.', xp:870, streak:9, bg:'var(--mint)', initials:'SR'},
   {name:'Jia T.', xp:640, streak:6, bg:'var(--violet)', initials:'JT'}
 ];
-let pendingResetCodes = {}; // email -> code
+
+/* ---------------- persistence (localStorage) ----------------
+   This is a real (not claude.ai artifact) prototype meant to be deployed
+   and handed to students, so we persist client-side with localStorage —
+   otherwise every reload would wipe every account's progress, which
+   would make real testing impossible. This is still NOT a substitute
+   for a real backend/database: it's per-browser, per-device only, and
+   anyone with devtools access on that device can read/edit it. See the
+   closing note in chat for what a production build needs instead. */
+const DB_KEY = 'proacta_db_v1';
+function saveDb(){
+  try{ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+  catch(e){ console.warn('Could not save progress locally:', e); }
+}
+function persist(){ saveDb(); }
+function loadDb(){
+  const fresh = seedDb();
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(!raw) return fresh;
+    const saved = JSON.parse(raw);
+    if(!saved || typeof saved !== 'object') return fresh;
+    // Keep whatever was saved, but make sure the two demo accounts always
+    // exist so the login hints on the auth screen keep working even if
+    // they were never touched (or were somehow removed) in a saved copy.
+    if(!saved['admin@proacta.app']) saved['admin@proacta.app'] = fresh['admin@proacta.app'];
+    if(!saved['migs@proacta.app']) saved['migs@proacta.app'] = fresh['migs@proacta.app'];
+    return saved;
+  } catch(e){
+    console.warn('Could not read saved progress, starting fresh:', e);
+    return fresh;
+  }
+}
+// Backfills fields added after a save might have been written, so an
+// older saved account doesn't crash on missing data.
+function ensureStateDefaults(u){
+  const s = u.state;
+  if(s.lastCheckinDate === undefined) s.lastCheckinDate = null;
+  if(!s.quests || !s.quests.progress || !s.quests.claimed) s.quests = freshQuestState();
+  if(!Array.isArray(s.tasks)) s.tasks = [];
+  s.tasks.forEach(t=>{
+    if(t.rewarded === undefined){
+      // Best-effort backfill: if it already looks fully done, treat it as
+      // already-rewarded so re-toggling it can't retroactively farm coins.
+      t.rewarded = t.subtasks.length>0 && t.subtasks.every(x=>x.done);
+    }
+  });
+}
+
+let db = loadDb();
+let pendingResetCodes = {}; // email -> code, intentionally NOT persisted
 let currentUserEmail = null;
 let state = null; // pointer into db[currentUserEmail].state while logged in
 let openTaskId = null;
@@ -889,6 +1006,7 @@ function doSignup(){
 
   err.textContent = '';
   db[email] = { name, email, role:'student', passHash: hashPass(pass), state: freshState(name) };
+  persist();
   toast('Account created — welcome to Proacta!');
   enterApp(db[email]);
 }
@@ -956,14 +1074,17 @@ function doResetPassword(){
   db[email].passHash = hashPass(newPass);
   delete pendingResetCodes[email];
   err.textContent = '';
+  persist();
   toast('Password reset — log in with your new password');
   switchAuthTab('login');
 }
 
 /* ---------------- ENTER APP ---------------- */
 function enterApp(user){
+  ensureStateDefaults(user);
   currentUserEmail = user.email;
   state = user.state;
+  ensureQuestsFresh();
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'flex';
 
@@ -996,6 +1117,7 @@ function enterApp(user){
 
 function renderAll(){
   renderStats();
+  renderQuests();
   renderRadar();
   renderHomeList();
   renderTasksScreen();
@@ -1015,6 +1137,7 @@ function toggleTheme(){
   state.darkMode = !state.darkMode;
   document.getElementById('appRoot').classList.toggle('dark', state.darkMode);
   document.getElementById('themeToggle').textContent = state.darkMode ? '☀️' : '🌙';
+  persist();
 }
 
 /* ---------------- CONFETTI ---------------- */
@@ -1190,12 +1313,15 @@ function addEventManual(){
   state.events.push({id: state.nextEventId++, title, date, note});
   document.getElementById('newEvTitle').value='';
   document.getElementById('newEvNote').value='';
+  bumpQuest('addEvent', 1);
   renderCalendar();
+  persist();
   toast('Added to calendar');
 }
 function deleteEvent(id){
   state.events = state.events.filter(e=>e.id!==id);
   renderCalendar();
+  persist();
 }
 async function quickAddDeadline(){
   if(!state.premiumActive){ toast('Unlock Premium to use AI deadline detection'); return; }
@@ -1213,9 +1339,11 @@ async function quickAddDeadline(){
     const parsed = extractJson(raw);
     if(!parsed || !parsed.title || !parsed.date) throw new Error('no-deadline');
     state.events.push({id: state.nextEventId++, title: parsed.title, date: parsed.date, note: parsed.note||''});
+    bumpQuest('addEvent', 1);
     hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
     input.value='';
     renderCalendar();
+    persist();
     toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
   } catch(err){
   console.error("QUICK PARSE ERROR:", err);
@@ -1229,10 +1357,12 @@ async function quickAddDeadline(){
       date: iso,
       note: 'Added via quick-parse (AI unreachable)'
     });
+    bumpQuest('addEvent', 1);
 
     hint.textContent = 'AI failed, so a local date parser was used.';
     input.value = '';
     renderCalendar();
+    persist();
 
     toast('AI ERROR: ' + (err.message || 'Unknown error'));
   } else {
@@ -1299,13 +1429,16 @@ function saveCurrentNote(){
     activeNoteId = state.nextNoteId++;
     state.notes.push({id: activeNoteId, title, body, updatedAt: Date.now()});
   }
+  bumpQuest('writeNote', 1);
   toast('Note saved');
   renderNotesList();
+  persist();
 }
 function deleteCurrentNote(){
   if(activeNoteId){
     state.notes = state.notes.filter(n=>n.id!==activeNoteId);
     toast('Note deleted');
+    persist();
   }
   closeNoteEditor();
 }
@@ -1333,10 +1466,13 @@ async function scanNoteForDeadlines(){
       appendAiMsg('ai', 'I didn\'t find a clear deadline in there.');
       return;
     }
+    let added = 0;
     items.forEach(it=>{
-      if(it.title && it.date) state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note||'From your notes'});
+      if(it.title && it.date){ state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note||'From your notes'}); added++; }
     });
+    if(added) bumpQuest('addEvent', added);
     renderCalendar();
+    persist();
     appendAiMsg('ai', 'Added '+items.length+' deadline'+(items.length>1?'s':'')+' to your calendar: '+items.map(i=>i.title).join(', '));
     toast('Calendar updated from your note');
   } catch(err){
@@ -1510,18 +1646,30 @@ function renderHomeList(){
     wrap.appendChild(row);
   });
 }
+// Rewards are gated by t.rewarded so a task only ever pays out coins/XP
+// once. Without this, repeatedly tapping the home-screen checkbox (which
+// flips a fully-done task back to not-done, then complete again) or
+// toggling a subtask off and back on would let a student farm unlimited
+// coins/XP from a single task. Completing/uncompleting still works for
+// bookkeeping — it just stops being a coin machine.
 function quickToggle(id){
   const t = state.tasks.find(x=>x.id===id);
   const allDone = t.subtasks.every(s=>s.done);
   if(!allDone){
     t.subtasks.forEach(s=>s.done=true);
-    state.coins += 20; addXp(15);
-    pulseCoins();
-    toast('Task complete! +20 coins · +15 XP');
+    if(!t.rewarded){
+      t.rewarded = true;
+      state.coins += 20; addXp(15);
+      pulseCoins();
+      bumpQuest('completeTask', 1);
+      toast('Task complete! +20 coins · +15 XP');
+    } else {
+      toast('Marked complete — already rewarded for this task earlier');
+    }
   } else {
     t.subtasks.forEach(s=>s.done=false);
   }
-  renderHomeList(); renderTasksScreen(); renderRadar(); renderStats(); renderCramAlert();
+  renderHomeList(); renderTasksScreen(); renderRadar(); renderStats(); renderCramAlert(); persist();
 }
 
 /* ---------------- TASKS SCREEN ---------------- */
@@ -1585,26 +1733,29 @@ function toggleCard(id){
   openTaskId = (openTaskId===id) ? null : id;
   renderTasksScreen();
 }
+// See the comment on quickToggle() above — same t.rewarded guard here so
+// checking a subtask off and back on can't be used to farm coins/XP.
 function toggleSub(taskId, idx){
   const t = state.tasks.find(x=>x.id===taskId);
-  const wasComplete = t.subtasks.every(s=>s.done);
   t.subtasks[idx].done = !t.subtasks[idx].done;
-  const isComplete = t.subtasks.every(s=>s.done);
-  if(isComplete && !wasComplete){
+  const isComplete = t.subtasks.length>0 && t.subtasks.every(s=>s.done);
+  if(isComplete && !t.rewarded){
+    t.rewarded = true;
     state.coins += 50; addXp(30);
     pulseCoins();
+    bumpQuest('completeTask', 1);
     const headEl = document.querySelector('.task-card.open .task-card-head');
     confettiBurst(headEl);
     toast('Task complete! +50 coins · +30 XP');
   }
   openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderStats(); renderCramAlert();
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderStats(); renderCramAlert(); persist();
 }
 function removeSub(taskId, idx){
   const t = state.tasks.find(x=>x.id===taskId);
   t.subtasks.splice(idx,1);
   openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
 }
 function addSub(taskId){
   const input = document.getElementById('newSub-'+taskId);
@@ -1612,8 +1763,13 @@ function addSub(taskId){
   if(!val) return;
   const t = state.tasks.find(x=>x.id===taskId);
   t.subtasks.push({t:val, done:false});
+  // Adding a genuinely new step is real new work, so let this task earn
+  // its completion reward again once every step (including this one) is
+  // finished — this is intentionally different from re-toggling an
+  // existing step, which stays blocked by the rewarded flag above.
+  t.rewarded = false;
   openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
 }
 function toggleAddForm(){
   document.getElementById('addForm').classList.toggle('show');
@@ -1624,13 +1780,13 @@ function addTask(){
   const zone = document.getElementById('newTaskZone').value;
   if(!title) { toast('Give the task a title first'); return; }
   state.tasks.unshift({
-    id: state.nextTaskId++, title, due: due || 'no date set', zone,
+    id: state.nextTaskId++, title, due: due || 'no date set', zone, rewarded:false,
     subtasks: [{t:'Get started', done:false}], celebrated:false
   });
   document.getElementById('newTaskTitle').value='';
   document.getElementById('newTaskDue').value='';
   document.getElementById('addForm').classList.remove('show');
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
   toast('Task added');
 }
 
@@ -1651,12 +1807,30 @@ function renderPips(){
     if(!state.premiumActive){ grantPremium('via 7-Day Lock-In'); }
   } else {
     card.classList.remove('unlocked');
-    btn.textContent = 'Check in today (day '+(state.lockInDay+1)+' of 7)';
+    const alreadyToday = state.lastCheckinDate === toLocalISO();
+    if(alreadyToday){
+      btn.textContent = 'Checked in today — come back tomorrow';
+      btn.disabled = true;
+    } else {
+      btn.textContent = 'Check in today (day '+(state.lockInDay+1)+' of 7)';
+      btn.disabled = false;
+    }
   }
 }
+// Real 7-day streaks need a real day gate — without this, a student could
+// click "Check in" 7 times in one sitting and unlock Premium + 500 coins
+// instantly. One check-in is now allowed per calendar day (student's
+// local time).
 function checkIn(){
   if(state.lockInDay >= 7) return;
+  const today = toLocalISO();
+  if(state.lastCheckinDate === today){
+    toast('Already checked in today — come back tomorrow');
+    return;
+  }
   state.lockInDay++;
+  state.lastCheckinDate = today;
+  bumpQuest('checkIn', 1);
   if(state.lockInDay === 7){
     state.coins += 500;
     pulseCoins();
@@ -1665,7 +1839,7 @@ function checkIn(){
   } else {
     toast('Day '+state.lockInDay+' locked in 🔥');
   }
-  renderPips(); renderStats(); renderPremiumBanner();
+  renderPips(); renderStats(); renderPremiumBanner(); persist();
 }
 function redeemPremium(){
   const cost = 1000;
@@ -1682,6 +1856,7 @@ function grantPremium(label){
   state.premiumLabel = label;
   setPerks(true);
   renderPremiumBanner();
+  persist();
 }
 function revokePremium(){
   state.premiumActive = false;
@@ -1690,6 +1865,7 @@ function revokePremium(){
   setPerks(false);
   renderPremiumBanner();
   document.getElementById('shieldToggle').classList.remove('on');
+  persist();
 }
 function renderPremiumBanner(){
   const banner = document.getElementById('premBanner');
@@ -1709,19 +1885,22 @@ function toggleShield(){
   state.shieldOn = !state.shieldOn;
   document.getElementById('shieldToggle').classList.toggle('on', state.shieldOn);
   toast(state.shieldOn ? 'Streak Shield armed 🛡️' : 'Streak Shield turned off');
+  persist();
 }
 
-/* ---------------- SQUAD CHAT ---------------- */
+/* ---------------- SQUAD CHAT ----------------
+   Previously this posted to /api/coach, which doesn't exist anywhere in
+   this project — every message silently failed with "Couldn't reach the
+   coach right now." It now reuses the same /api/gemini function the
+   rest of the app already has working, with a short chat-flavored system
+   prompt. */
 async function askCoach(message){
   try {
-    const res = await fetch('/api/coach', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
-    });
-    const data = await res.json();
-    return data.reply || "Coach didn't respond.";
+    const sys = 'You are an upbeat, supportive study-squad chat bot inside a student productivity app called Proacta. Reply like a friendly classmate in a group chat: one short casual sentence, under 30 words, no markdown, no asterisks.';
+    const { text } = await callGemini(message, sys);
+    return text.trim() || "Coach didn't respond.";
   } catch (err) {
+    console.error('COACH ERROR:', err);
     return "Couldn't reach the coach right now.";
   }
 }
@@ -1738,9 +1917,11 @@ function sendChat(){
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
   input.value='';
+  bumpQuest('chatSquad', 1);
+  persist();
 
   const thinking = document.createElement('div');
-  thinking.className = 'msg coach';
+  thinking.className = 'msg them';
   thinking.innerHTML = '<b>Coach</b>Thinking…';
   log.appendChild(thinking);
   log.scrollTop = log.scrollHeight;
@@ -1795,6 +1976,7 @@ function setTheme(el){
   state.accentC2 = el.dataset.c2;
   document.documentElement.style.setProperty('--accent', el.dataset.c1);
   document.documentElement.style.setProperty('--accent-2', el.dataset.c2);
+  persist();
 }
 function setTitle(el, text){
   document.querySelectorAll('.title-pick .badge').forEach((b,i)=>{
@@ -1804,6 +1986,7 @@ function setTitle(el, text){
   el.classList.add('selected');
   state.titleBadge = text;
   document.getElementById('titleBadge').textContent = text;
+  persist();
 }
 
 /* ---------------- ADMIN ---------------- */
@@ -1842,6 +2025,7 @@ function adminGrant(email){
   toast('Premium granted to ' + db[email].name);
   renderAdmin();
   if(email===currentUserEmail){ setPerks(true); renderPremiumBanner(); }
+  persist();
 }
 function adminRevoke(email){
   if(!db[email]) return;
@@ -1851,6 +2035,7 @@ function adminRevoke(email){
   toast('Premium revoked for ' + db[email].name);
   renderAdmin();
   if(email===currentUserEmail){ setPerks(false); renderPremiumBanner(); document.getElementById('shieldToggle').classList.remove('on'); }
+  persist();
 }
 function adminDelete(email){
   if(!db[email] || db[email].role==='admin') return;
@@ -1858,6 +2043,7 @@ function adminDelete(email){
   delete db[email];
   toast('Deleted account: ' + name);
   renderAdmin();
+  persist();
   if(email===currentUserEmail){ doLogout(); }
 }
 
