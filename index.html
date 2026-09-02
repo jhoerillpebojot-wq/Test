@@ -919,11 +919,7 @@ function seedDb(){
     }
   };
 }
-const npcClassmates = [
-  {name:'Alex L.', xp:1240, streak:18, bg:'var(--gold)', initials:'AL'},
-  {name:'Sam R.', xp:870, streak:9, bg:'var(--mint)', initials:'SR'},
-  {name:'Jia T.', xp:640, streak:6, bg:'var(--violet)', initials:'JT'}
-];
+
 
 /* ---------------- persistence (localStorage) ----------------
    This is a real (not claude.ai artifact) prototype meant to be deployed
@@ -2013,26 +2009,32 @@ function sendChat(){
 document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
 
 /* ---------------- LEADERBOARD ---------------- */
-function renderLeaderboard(){
+async function renderLeaderboard(){
   const wrap = document.getElementById('leaderboardCard');
   if(!wrap) return;
-  const real = Object.values(db).filter(u=>u.role!=='admin').map(u=>({
-    name: u.name + (u.email===currentUserEmail ? ' (You)' : ''),
-    xp: (u.state.level-1)*u.state.xpMax + u.state.xp,
-    streak: u.state.streak,
-    initials: u.state.initials,
-    bg: 'var(--coral)',
-    isYou: u.email===currentUserEmail
-  }));
-  const all = [...npcClassmates.map(n=>({...n})), ...real].sort((a,b)=>b.xp-a.xp);
-  wrap.innerHTML = all.map((p,i)=>`
-    <div class="lb-row ${p.isYou?'you':''}">
-      <div class="lb-rank">${i+1}</div>
-      <div class="avatar" style="background:${p.bg};">${p.initials}</div>
-      <div class="lb-name"><strong>${escapeHtml(p.name)}</strong><span>${p.streak}-day streak</span></div>
-      <div class="lb-xp">${p.xp.toLocaleString()} XP</div>
-    </div>
-  `).join('');
+  wrap.innerHTML = '<div class="empty-row">Loading leaderboard…</div>';
+  try{
+    const res = await fetch('/api/leaderboard');
+    const data = await res.json();
+    if(!res.ok){ wrap.innerHTML = '<div class="empty-row">Could not load leaderboard.</div>'; return; }
+    const all = data.leaderboard.map(p => ({
+      ...p,
+      isYou: p.id === currentUserId,
+      name: p.name + (p.id === currentUserId ? ' (You)' : '')
+    }));
+    if(!all.length){ wrap.innerHTML = '<div class="empty-row">No students yet — be the first!</div>'; return; }
+    wrap.innerHTML = all.map((p,i)=>`
+      <div class="lb-row ${p.isYou?'you':''}">
+        <div class="lb-rank">${i+1}</div>
+        <div class="avatar" style="background:var(--coral);">${escapeHtml(p.initials)}</div>
+        <div class="lb-name"><strong>${escapeHtml(p.name)}</strong><span>${p.streak}-day streak</span></div>
+        <div class="lb-xp">${p.xp.toLocaleString()} XP</div>
+      </div>
+    `).join('');
+  } catch(e){
+    console.error('LEADERBOARD FETCH ERROR:', e);
+    wrap.innerHTML = '<div class="empty-row">Could not reach the server.</div>';
+  }
 }
 function renderTitlesRow(){
   const wrap = document.getElementById('titlesBadgeRow');
