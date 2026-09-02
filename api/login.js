@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       ? await sql`SELECT * FROM subtasks WHERE task_id = ANY(${taskIds}) ORDER BY sort_order ASC, id ASC`
       : [];
     const subtasksByTask = {};
-        for (const s of subtasks) {
+            for (const s of subtasks) {
       (subtasksByTask[s.task_id] = subtasksByTask[s.task_id] || []).push({
         id: s.id, t: s.text, done: s.done
       });
