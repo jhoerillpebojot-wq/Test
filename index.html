@@ -2115,33 +2115,107 @@ function setTitle(el, text){
 }
 
 /* ---------------- ADMIN ---------------- */
-function renderAdmin(){
+async function renderAdmin(){
   const listEl = document.getElementById('adminUserList');
   if(!listEl) return;
-  const users = Object.values(db);
-  document.getElementById('admStatUsers').textContent = users.length;
-  document.getElementById('admStatPremium').textContent = users.filter(u=>u.state.premiumActive).length;
-  document.getElementById('admStatCoins').textContent = users.reduce((sum,u)=>sum+u.state.coins,0).toLocaleString();
+  listEl.innerHTML = '<div class="empty-row">Loading accounts…</div>';
+  try{
+    const res = await fetch('/api/admin', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'list', adminUserId: currentUserId })
+    });
+    const data = await res.json();
+    if(!res.ok){ listEl.innerHTML = '<div class="empty-row">'+(data.error||'Could not load accounts')+'</div>'; return; }
 
-  listEl.innerHTML = users.map(u=>`
-    <div class="user-row">
-      <div class="urow-top">
-        <div class="avatar" style="background:var(--violet);">${u.state.initials}</div>
-        <div class="uinfo"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>
-        <div class="tag-row">
-          <span class="role-tag ${u.role==='admin'?'admin':''}">${u.role}</span>
-          ${u.state.premiumActive ? '<span class="prem-tag">Premium</span>' : ''}
+    document.getElementById('admStatUsers').textContent = data.users.length;
+    document.getElementById('admStatPremium').textContent = data.premiumCount;
+    document.getElementById('admStatCoins').textContent = data.totalCoins.toLocaleString();
+
+    listEl.innerHTML = data.users.map(u=>`
+      <div class="user-row">
+        <div class="urow-top">
+          <div class="avatar" style="background:var(--violet);">${escapeHtml(u.initials)}</div>
+          <div class="uinfo"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>
+          <div class="tag-row">
+            <span class="role-tag ${u.role==='admin'?'admin':''}">${u.role}</span>
+            ${u.premiumActive ? '<span class="prem-tag">Premium</span>' : ''}
+          </div>
+        </div>
+        <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Lv ${u.level} · ${u.coins.toLocaleString()}🪙 · ${u.xp}/${u.xpMax} XP · ${u.streak}🔥 streak</div>
+        <div class="uactions">
+          ${u.premiumActive
+            ? `<button class="btn btn-ghost btn-sm" onclick="adminRevoke(${u.id})">Revoke premium</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="adminGrant(${u.id})">Grant premium</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="adminGiveCoins(${u.id}, 1000)">+1000 🪙</button>
+          <button class="btn btn-ghost btn-sm" onclick="adminGiveXp(${u.id}, 1000)">+1000 XP</button>
+          <button class="btn btn-ghost btn-sm" onclick="adminMaxCoins(${u.id})">Max coins</button>
+          ${u.role!=='admin' ? `<button class="btn btn-danger btn-sm" onclick="adminDelete(${u.id}, '${escapeHtml(u.name)}')">Delete account</button>` : ''}
         </div>
       </div>
-      <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Lv ${u.state.level} · ${u.state.coins}🪙 · ${u.state.streak}🔥 streak</div>
-      <div class="uactions">
-        ${u.state.premiumActive
-          ? `<button class="btn btn-ghost btn-sm" onclick="adminRevoke('${u.email}')">Revoke premium</button>`
-          : `<button class="btn btn-ghost btn-sm" onclick="adminGrant('${u.email}')">Grant 7-day premium</button>`}
-        ${u.role!=='admin' ? `<button class="btn btn-danger btn-sm" onclick="adminDelete('${u.email}')">Delete account</button>` : ''}
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  } catch(e){
+    console.error('ADMIN LIST ERROR:', e);
+    listEl.innerHTML = '<div class="empty-row">Could not reach the server.</div>';
+  }
+}
+
+async function adminAction(payload){
+  try{
+    const res = await fetch('/api/admin', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ adminUserId: currentUserId, ...payload })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Admin action failed'); return null; }
+    return data;
+  } catch(e){
+    console.error('ADMIN ACTION ERROR:', e);
+    toast('Could not reach the server');
+    return null;
+  }
+}
+
+async function adminGrant(targetUserId){
+  const data = await adminAction({ action:'grantPremium', targetUserId });
+  if(!data) return;
+  toast('Premium granted');
+  renderAdmin();
+  if(targetUserId === currentUserId){ state.premiumActive = true; state.premiumLabel = data.premiumLabel; setPerks(true); renderPremiumBanner(); }
+}
+async function adminRevoke(targetUserId){
+  const data = await adminAction({ action:'revokePremium', targetUserId });
+  if(!data) return;
+  toast('Premium revoked');
+  renderAdmin();
+  if(targetUserId === currentUserId){ state.premiumActive = false; state.premiumLabel = ''; state.shieldOn = false; setPerks(false); renderPremiumBanner(); document.getElementById('shieldToggle').classList.remove('on'); }
+}
+async function adminGiveCoins(targetUserId, amount){
+  const data = await adminAction({ action:'giveCoins', targetUserId, amount });
+  if(!data) return;
+  toast('+'+amount+' 🪙 given');
+  renderAdmin();
+  if(targetUserId === currentUserId){ state.coins = data.coins; pulseCoins(); renderStats(); }
+}
+async function adminGiveXp(targetUserId, amount){
+  const data = await adminAction({ action:'giveXp', targetUserId, amount });
+  if(!data) return;
+  toast('+'+amount+' XP given');
+  renderAdmin();
+  if(targetUserId === currentUserId){ state.xp = data.xp; state.level = data.level; state.xpMax = data.xpMax; renderStats(); }
+}
+async function adminMaxCoins(targetUserId){
+  const data = await adminAction({ action:'setCoins', targetUserId, value: 999999 });
+  if(!data) return;
+  toast('Coins set to '+data.coins.toLocaleString());
+  renderAdmin();
+  if(targetUserId === currentUserId){ state.coins = data.coins; pulseCoins(); renderStats(); }
+}
+async function adminDelete(targetUserId, name){
+  const data = await adminAction({ action:'delete', targetUserId });
+  if(!data) return;
+  toast('Deleted account: ' + name);
+  renderAdmin();
+  if(targetUserId === currentUserId){ doLogout(); }
 }
 function adminGrant(email){
   if(!db[email]) return;
