@@ -19,6 +19,13 @@
 //    candidate blocked by a safety filter, used to silently turn into
 //    an empty string. Now it's reported as an actual error so the UI
 //    doesn't have to guess.
+//
+// Verified Sept 2026: gemini-3.6-flash, gemini-3.5-flash and
+// gemini-3.5-flash-lite are all real, currently-GA model ids, so the
+// chain below is correct as-is. If you see 404s again in the future,
+// it's most likely because Google has retired one of these — check
+// https://ai.google.dev/gemini-api/docs/changelog and update the
+// modelsToTry list below.
 
 export default async function handler(req, res) {
   console.log("GEMINI FUNCTION CALLED");
