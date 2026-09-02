@@ -63,27 +63,33 @@ export default async function handler(req, res) {
     const subtasks = taskIds.length
       ? await sql`SELECT * FROM subtasks WHERE task_id = ANY(${taskIds}) ORDER BY sort_order ASC, id ASC`
       : [];
+    // Postgres BIGINT id columns come back from the driver as text
+    // strings, not JS numbers — cast every id to Number here so later
+    // === comparisons in the frontend (e.g. openTaskId === t.id) work
+    // instead of silently always failing (3 === "3" is false in JS).
     const subtasksByTask = {};
-            for (const s of subtasks) {
+    for (const s of subtasks) {
       (subtasksByTask[s.task_id] = subtasksByTask[s.task_id] || []).push({
-        id: s.id, t: s.text, done: s.done
+        id: Number(s.id), t: s.text, done: s.done
       });
     }
     const tasksOut = tasks.map(t => ({
-      id: t.id, title: t.title, due: t.due, zone: t.zone,
+      id: Number(t.id), title: t.title, due: t.due, zone: t.zone,
       rewarded: t.rewarded, celebrated: t.celebrated,
       subtasks: subtasksByTask[t.id] || []
     }));
 
-    const events = await sql`
+    const eventsRaw = await sql`
       SELECT id, title, event_date AS date, note FROM events
       WHERE user_id = ${user.id} ORDER BY event_date ASC
     `;
+    const events = eventsRaw.map(e => ({ ...e, id: Number(e.id) }));
 
-    const notes = await sql`
+    const notesRaw = await sql`
       SELECT id, title, body, updated_at AS "updatedAt" FROM notes
       WHERE user_id = ${user.id} ORDER BY updated_at DESC
     `;
+    const notes = notesRaw.map(n => ({ ...n, id: Number(n.id) }));
 
     const today = new Date().toISOString().slice(0, 10);
     const questRows = await sql`
