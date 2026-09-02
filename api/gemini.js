@@ -4,10 +4,11 @@
 // 1. THE BUG: "gemini-3.6-flash" is not a real model id — every call was
 //    failing with a 404-ish "invalid response," which the frontend then
 //    showed as "AI ERROR: The AI server returned an invalid response."
-// 2. Model + fallback chain: pinned to "gemini-3.5-flash" as the primary
-//    model, with automatic fallback to "gemini-2.5-flash" then
-//    "gemini-flash-latest" if the primary is overloaded (503/429/"high
-//    demand"). A demand spike on one model no longer breaks the feature.
+// 2. Model + fallback chain: primary model is "gemini-3.6-flash" (current
+//    GA recommendation), falling back to "gemini-3.5-flash" then
+//    "gemini-3.5-flash-lite" if the primary is overloaded or unavailable
+//    (503/429/404/"overloaded"/"no longer available"/etc). Deliberately
+//    excludes "gemini-2.5-flash" — Google has closed it to new API keys.
 // 3. Multi-turn context: accepts an optional `history` array so
 //    follow-up questions about a note actually remember earlier turns,
 //    instead of every question being answered in isolation.
@@ -76,11 +77,12 @@ export default async function handler(req, res) {
       requestBody.tools = [{ google_search: {} }];
     }
 
-    // Try 3.5 Flash first, but automatically fall back to other models if
-    // it's overloaded — a single pinned model still goes down whenever
-    // *that* model has a demand spike, so on a 503/"overloaded"/"UNAVAILABLE"
-    // response we retry against the next one in line instead of failing.
-    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+    // Model lineup, in priority order. gemini-2.5-flash is dropped entirely —
+    // Google has closed it off to new API keys ("no longer available to new
+    // users"), so it would just fail every time and waste a retry. Primary
+    // is 3.6 Flash (current GA recommendation), falling back to 3.5 Flash
+    // then 3.5 Flash-Lite if the primary is overloaded.
+    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"];
 
     let response, data, usedModel;
     for (let i = 0; i < modelsToTry.length; i++) {
@@ -100,15 +102,16 @@ export default async function handler(req, res) {
       data = await response.json();
       console.log("GEMINI STATUS:", usedModel, response.status);
 
-      const isOverloaded =
+      const shouldFallback =
         response.status === 503 ||
         response.status === 429 ||
-        /overload|unavailable|high demand/i.test(data?.error?.message || "");
+        response.status === 404 || // model id retired/unavailable to this key
+        /overload|unavailable|high demand|no longer available/i.test(data?.error?.message || "");
 
-      if (response.ok || !isOverloaded || i === modelsToTry.length - 1) {
-        break; // success, a non-overload error (don't waste retries on it), or out of options
+      if (response.ok || !shouldFallback || i === modelsToTry.length - 1) {
+        break; // success, an error a different model won't fix, or out of options
       }
-      console.log(`${usedModel} overloaded, falling back to ${modelsToTry[i + 1]}`);
+      console.log(`${usedModel} unavailable, falling back to ${modelsToTry[i + 1]}`);
     }
 
     console.log("GEMINI RESPONSE:", JSON.stringify(data));
