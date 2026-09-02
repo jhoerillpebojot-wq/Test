@@ -596,8 +596,14 @@
 
           <div class="ai-panel" id="aiPanelUnlocked" style="display:none;">
             <div class="ai-label">🧠 AI Study Coach</div>
-            <button class="btn btn-ghost btn-block" style="margin-bottom:10px;" onclick="scanNoteForDeadlines()">Scan this note for deadlines</button>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+              <button class="btn btn-ghost" style="flex:1;" onclick="scanNoteForDeadlines()">Scan for deadlines</button>
+              <button class="btn btn-ghost" style="flex:1;" onclick="summarizeNoteAi()">Summarize note</button>
+            </div>
             <div class="ai-chat-log" id="aiChatLog"></div>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-soft); margin:8px 2px;">
+              <input type="checkbox" id="aiSearchToggle" style="margin:0;"> Let AI search the web for extra context
+            </label>
             <div class="ai-input-row" style="display:flex; gap:8px;">
               <input type="text" id="aiAskInput" placeholder="Ask about this note…" style="flex:1; padding:10px 12px; border-radius:100px; border:1px solid var(--line); background:var(--fog); font-size:12.5px;" onkeydown="if(event.key==='Enter') askAiAboutNote()">
               <button class="btn btn-dark" onclick="askAiAboutNote()">Ask</button>
@@ -756,10 +762,20 @@ function hashPass(p){
 }
 function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 function genCode(){ return String(Math.floor(100000 + Math.random()*900000)); }
+// toISOString() converts to UTC, so "new Date().toISOString().slice(0,10)"
+// gives the WRONG day for part of every 24 hours in any timezone that
+// isn't UTC — e.g. for a user in Manila (UTC+8), it reports "today" as
+// yesterday for the first ~8 hours after their midnight. This computes
+// the date using the browser's own local timezone instead.
+function toLocalISO(d){
+  d = d || new Date();
+  const tzOffsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0,10);
+}
 function isoInDays(n){
   const d = new Date();
   d.setDate(d.getDate()+n);
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 function initialsOf(name){
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -1018,29 +1034,65 @@ function confettiBurst(originEl){
   }
 }
 
-/* ---------------- AI (real Claude API call — works when this file is
-   running as a Claude.ai artifact; if it can't reach the API — e.g. the
-   file was saved and opened outside Claude.ai — a lightweight local
-   date-parser fallback kicks in so the feature still works, just less
-   smart) ---------------- */
-async function callGemini(userPrompt, systemPrompt) {
-  const prompt = systemPrompt ? systemPrompt + "\n\n" + userPrompt : userPrompt;
-  const response = await fetch("/api/gemini", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});
-  let data; try { data = await response.json(); } catch(e) { throw new Error("The AI server returned an invalid response."); }
-  if(!response.ok) throw new Error(data?.error || "Gemini request failed");
-  if(!data?.text || !data.text.trim()) throw new Error("Gemini returned an empty response.");
-  return data.text.trim();
-}
-function cleanAiJson(raw){
-  let text=String(raw||"").trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
-  const starts=[text.indexOf("{"),text.indexOf("[")].filter(i=>i>=0);
-  if(starts.length){const first=Math.min(...starts);if(first>0)text=text.slice(first);}
-  const last=Math.max(text.lastIndexOf("}"),text.lastIndexOf("]"));
-  if(last>=0)text=text.slice(0,last+1);
-  return text.trim();
+/* ---------------- AI (calls our /api/gemini serverless function, which
+   talks to the Gemini API. If that request fails outright — no network,
+   bad deploy, etc — a lightweight local date-parser fallback kicks in
+   for the quick-add flow so that one feature still works, just less
+   smart) ----------------
+   opts:
+     history:   [{role:'user'|'model', text}, ...] previous turns, for
+                follow-up questions that should remember earlier context
+     useSearch: true to let Gemini ground its answer with live Google
+                Search results (for "teach me more than what's in this
+                note" style questions)
+   Returns { text, sources } */
+async function callGemini(userPrompt, systemPrompt, opts) {
+  opts = opts || {};
+
+  const response = await fetch("/api/gemini", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt: userPrompt,
+      systemPrompt: systemPrompt || undefined,
+      history: opts.history || undefined,
+      useSearch: !!opts.useSearch
+    })
+  });
+
+  const data = await response.json();
+
+  console.log("OUR API RESPONSE:", data);
+
+  if (!response.ok) {
+    throw new Error(data.error || "Gemini request failed");
+  }
+
+  return { text: data.text || "", sources: data.sources || [] };
 }
 
-
+/* Gemini is told to reply with ONLY JSON, but models sometimes wrap it
+   in a sentence anyway. Try a straight parse first, then fall back to
+   pulling out the first {...} or [...] block before giving up. */
+function extractJson(raw) {
+  if (!raw) return null;
+  const clean = raw.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    const match = clean.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (match) {
+      try {
+        return JSON.parse(match[1]);
+      } catch (e2) {
+        return null;
+      }
+    }
+    return null;
+  }
+}
 function localDateParse(text){
   const months = {january:0,jan:0,february:1,feb:1,march:2,mar:2,april:3,apr:3,may:4,june:5,jun:5,
     july:6,jul:6,august:7,aug:7,september:8,sep:8,sept:8,october:9,oct:9,november:10,nov:10,december:11,dec:11};
@@ -1053,7 +1105,7 @@ function localDateParse(text){
   let year = now.getFullYear();
   let candidate = new Date(year, monthIdx, day);
   if(candidate < now) candidate = new Date(year+1, monthIdx, day);
-  return candidate.toISOString().slice(0,10);
+  return toLocalISO(candidate);
 }
 
 /* ---------------- CALENDAR & NOTES sub-tabs ---------------- */
@@ -1092,7 +1144,7 @@ function renderCalendar(){
   const first = new Date(y,m,1);
   const startOffset = first.getDay();
   const daysInMonth = new Date(y,m+1,0).getDate();
-  const todayIso = new Date().toISOString().slice(0,10);
+  const todayIso = toLocalISO();
   const evByDate = {};
   state.events.forEach(e=>{ (evByDate[e.date] = evByDate[e.date]||[]).push(e); });
 
@@ -1146,25 +1198,49 @@ function deleteEvent(id){
   renderCalendar();
 }
 async function quickAddDeadline(){
-  if(!state.premiumActive){toast('Unlock Premium to use AI deadline detection');return;}
-  const input=document.getElementById('quickAddInput'),text=input.value.trim(),hint=document.getElementById('quickAddHint');
-  if(!text){toast('Type a sentence first, e.g. "deadline in October 27"');return;}
-  hint.textContent='AI is reading that…';
+  if(!state.premiumActive){ toast('Unlock Premium to use AI deadline detection'); return; }
+  const input = document.getElementById('quickAddInput');
+  const text = input.value.trim();
+  if(!text){ toast('Type a sentence first, e.g. "deadline in October 27"'); return; }
+  const hint = document.getElementById('quickAddHint');
+  hint.textContent = 'AI is reading that…';
   try{
-    const today=new Date().toISOString().slice(0,10);
-    const prompt=`You extract deadlines from a student message. Today is ${today}.\nSTUDENT MESSAGE:\n${text}\nReturn ONLY valid JSON: {"title":"short label","date":"YYYY-MM-DD","note":""}. If no deadline is mentioned, return {"title":null}. If year is omitted, use the nearest future occurrence.`;
-    const parsed=JSON.parse(cleanAiJson(await callGemini(prompt)));
-    if(!parsed.title||!parsed.date)throw new Error('No deadline detected');
-    state.events.push({id:state.nextEventId++,title:parsed.title,date:parsed.date,note:parsed.note||''});
-    input.value='';hint.textContent='Premium feature — turns a sentence into a real calendar entry.';renderCalendar();toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
-  }catch(err){
-    console.error('QUICK PARSE ERROR:',err);const iso=localDateParse(text);
-    if(iso){state.events.push({id:state.nextEventId++,title:text.length>40?text.slice(0,40)+'…':text,date:iso,note:'Added via quick-parse (AI unavailable)'});input.value='';hint.textContent='AI was unavailable, so the local date parser was used.';renderCalendar();toast('Added using local date detection');}
-    else{hint.textContent="Couldn't find a date in that — try including a month and day.";toast('AI error: '+(err.message||'Unknown error'));}
+    const todayD = new Date();
+    const today = toLocalISO(todayD);
+    const todayWeekday = todayD.toLocaleDateString(undefined,{weekday:'long'});
+    const sys = 'You extract deadlines from a student\'s casual, possibly typo-ridden message. Read past typos and shorthand and infer the intended meaning. Today is '+today+' ('+todayWeekday+'). Resolve relative dates like "today", "tomorrow", "next Friday", or "in 2 weeks" against that. For "next <weekday>", mean the nearest upcoming occurrence of that weekday. Respond with ONLY strict JSON, no other text, no markdown fences, in this exact shape: {"title":"short label for the deadline","date":"YYYY-MM-DD","note":""}. If the year is not stated, infer the nearest future occurrence of that date. If no deadline is mentioned, respond with {"title":null}.';
+    const { text: raw } = await callGemini(text, sys);
+    const parsed = extractJson(raw);
+    if(!parsed || !parsed.title || !parsed.date) throw new Error('no-deadline');
+    state.events.push({id: state.nextEventId++, title: parsed.title, date: parsed.date, note: parsed.note||''});
+    hint.textContent = 'Premium feature — turns a sentence into a real calendar entry.';
+    input.value='';
+    renderCalendar();
+    toast('AI added "'+parsed.title+'" on '+fmtEvDate(parsed.date));
+  } catch(err){
+  console.error("QUICK PARSE ERROR:", err);
+
+  const iso = localDateParse(text);
+
+  if(iso){
+    state.events.push({
+      id: state.nextEventId++,
+      title: text.length > 40 ? text.slice(0,40) + '…' : text,
+      date: iso,
+      note: 'Added via quick-parse (AI unreachable)'
+    });
+
+    hint.textContent = 'AI failed, so a local date parser was used.';
+    input.value = '';
+    renderCalendar();
+
+    toast('AI ERROR: ' + (err.message || 'Unknown error'));
+  } else {
+    hint.textContent = 'Couldn\'t find a date in that — try including a month and day.';
+    toast('No date detected');
   }
 }
-
-
+}
 
 /* ---------------- NOTES ---------------- */
 let activeNoteId = null;
@@ -1189,6 +1265,7 @@ function newNote(){
   document.getElementById('noteTitleInput').value = '';
   document.getElementById('noteBodyInput').value = '';
   document.getElementById('aiChatLog').innerHTML = '';
+  noteChatHistory = [];
   openNoteEditor();
 }
 function openNote(id){
@@ -1198,6 +1275,7 @@ function openNote(id){
   document.getElementById('noteTitleInput').value = n.title;
   document.getElementById('noteBodyInput').value = n.body;
   document.getElementById('aiChatLog').innerHTML = '';
+  noteChatHistory = [];
   openNoteEditor();
 }
 function openNoteEditor(){
@@ -1240,32 +1318,76 @@ function appendAiMsg(who, text){
   log.scrollTop = log.scrollHeight;
 }
 async function scanNoteForDeadlines(){
-  if(!state.premiumActive)return;
-  const body=document.getElementById('noteBodyInput').value.trim();
-  if(!body){toast('Write some notes first');return;}
-  appendAiMsg('ai','Scanning this note for deadlines…');
+  if(!state.premiumActive) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  if(!body){ toast('Write some notes first'); return; }
+  appendAiMsg('ai', 'Scanning this note for deadlines…');
   try{
-    const today=new Date().toISOString().slice(0,10);
-    const prompt=`Find clear deadlines, due dates, exams, submissions, and scheduled events in these student notes. Today is ${today}.\n\nNOTE:\n${body}\n\nReturn ONLY valid JSON array: [{"title":"...","date":"YYYY-MM-DD","note":"..."}]. If none, return []. Do not invent dates.`;
-    const items=JSON.parse(cleanAiJson(await callGemini(prompt)));
-    if(!Array.isArray(items)||!items.length){appendAiMsg('ai',"I didn't find a clear deadline in there.");return;}
-    let added=0;items.forEach(it=>{if(it?.title&&/^\d{4}-\d{2}-\d{2}$/.test(it.date)){state.events.push({id:state.nextEventId++,title:it.title,date:it.date,note:it.note||'From your notes'});added++;}});
-    if(!added){appendAiMsg('ai','I found possible dates, but none were clear enough to safely add.');return;}
-    renderCalendar();appendAiMsg('ai','Added '+added+' deadline'+(added>1?'s':'')+' to your calendar.');toast('Calendar updated from your note');
-  }catch(err){console.error('DEADLINE SCAN ERROR:',err);appendAiMsg('ai','AI ERROR: '+(err.message||"Couldn't reach the AI service."));}
+    const todayD = new Date();
+    const today = toLocalISO(todayD);
+    const todayWeekday = todayD.toLocaleDateString(undefined,{weekday:'long'});
+    const sys = 'You extract deadlines, due dates, and events from a student\'s notes. The notes may contain typos, shorthand, or mistyped words — read past small typos and infer the intended meaning rather than getting stuck on them. Today is '+today+' ('+todayWeekday+'). Resolve relative dates like "today", "tomorrow", "next Friday", or "in 2 weeks" against that. For "next <weekday>", mean the nearest upcoming occurrence of that weekday. Respond with ONLY strict JSON, no markdown fences, no other text: an array like [{"title":"...","date":"YYYY-MM-DD","note":"..."}]. If none, respond with [].';
+    const { text: raw } = await callGemini(body, sys);
+    const items = extractJson(raw);
+    if(!Array.isArray(items) || !items.length){
+      appendAiMsg('ai', 'I didn\'t find a clear deadline in there.');
+      return;
+    }
+    items.forEach(it=>{
+      if(it.title && it.date) state.events.push({id: state.nextEventId++, title: it.title, date: it.date, note: it.note||'From your notes'});
+    });
+    renderCalendar();
+    appendAiMsg('ai', 'Added '+items.length+' deadline'+(items.length>1?'s':'')+' to your calendar: '+items.map(i=>i.title).join(', '));
+    toast('Calendar updated from your note');
+  } catch(err){
+    console.error('SCAN ERROR:', err);
+    appendAiMsg('ai', "Couldn't reach the AI service right now (" + (err.message || 'unknown error') + ") — you can still add deadlines manually on the Calendar tab.");
+  }
 }
+async function summarizeNoteAi(){
+  if(!state.premiumActive) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  if(!body){ toast('Write some notes first'); return; }
+  appendAiMsg('ai', 'Summarizing this note…');
+  try{
+    const sys = 'You are a study coach. Summarize the student\'s note below into 3-5 short bullet points (use "•" not markdown) capturing the key ideas, then on a final line flag anything that looks unfinished or unclear. The note may contain typos or shorthand — read past them and do not comment on spelling. Keep the whole summary under 100 words.';
+    const { text: raw } = await callGemini(body, sys);
+    appendAiMsg('ai', raw.trim() || "Hmm, that came back empty — try again.");
+  } catch(err){
+    console.error('SUMMARY ERROR:', err);
+    appendAiMsg('ai', "Couldn't reach the AI service right now (" + (err.message || 'unknown error') + ").");
+  }
+}
+let noteChatHistory = []; // [{role:'user'|'model', text}] — cleared per note, keeps Q&A context
 async function askAiAboutNote(){
-  if(!state.premiumActive)return;
-  const input=document.getElementById('aiAskInput'),question=input.value.trim();
-  if(!question)return;
-  const title=document.getElementById('noteTitleInput').value.trim(),body=document.getElementById('noteBodyInput').value.trim();
-  if(!body){appendAiMsg('ai','There is no note content yet. Write or paste some notes first.');return;}
-  appendAiMsg('you',question);input.value='';
-  const prompt=`You are Proacta's AI Study Coach.\n\nNOTE TITLE:\n${title||'Untitled note'}\n\nNOTE CONTENT:\n---\n${body}\n---\n\nSTUDENT QUESTION:\n${question}\n\nAnswer using the note above. If the student asks what the note is about, summarize the main topic and most important ideas. If the answer is not in the note, say so rather than inventing information. Explain simply and clearly. Keep the answer under 150 words.`;
-  try{const answer=await callGemini(prompt);appendAiMsg('ai',answer||'I could not generate an answer. Please try again.');}catch(err){console.error('AI COACH ERROR:',err);appendAiMsg('ai','AI ERROR: '+(err.message||"Couldn't reach the AI service."));}
+  if(!state.premiumActive) return;
+  const input = document.getElementById('aiAskInput');
+  const question = input.value.trim();
+  if(!question) return;
+  const body = document.getElementById('noteBodyInput').value.trim();
+  const useSearch = !!document.getElementById('aiSearchToggle')?.checked;
+  appendAiMsg('you', question);
+  input.value='';
+  try{
+    const sys = 'You are a friendly, encouraging AI study coach for a student. Keep answers short (under 120 words), practical, and specific to their note below when it\'s relevant. The note may contain typos or mistyped words — read past them and infer intent; never nitpick spelling. '
+      + (useSearch
+          ? 'You have live web search available — use it to add useful, accurate outside knowledge beyond what\'s in the note, and say clearly when you\'re drawing on it.'
+          : 'Answer from the note and your own general knowledge; if something is missing, say so rather than guessing.')
+      + ' If the note is empty, answer generally.\n\nSTUDENT NOTE:\n'+(body || '(empty)');
+    const { text: raw, sources } = await callGemini(question, sys, { history: noteChatHistory, useSearch });
+    const answer = raw.trim() || 'Hmm, I got an empty response — try asking again.';
+    appendAiMsg('ai', answer);
+    noteChatHistory.push({role:'user', text: question});
+    noteChatHistory.push({role:'model', text: answer});
+    if(noteChatHistory.length > 12) noteChatHistory = noteChatHistory.slice(-12); // keep last ~6 exchanges
+    if(useSearch && sources && sources.length){
+      appendAiMsg('ai', 'Sources: ' + sources.slice(0,3).map(s=>s.title||s.uri).join(' · '));
+    }
+  } catch(err){
+    console.error('ASK ERROR:', err);
+    appendAiMsg('ai', "Couldn't reach the AI service right now (" + (err.message || 'unknown error') + "). Try again in a bit.");
+  }
 }
-
-
 
 /* ---------------- NAV ---------------- */
 const navbtns = document.querySelectorAll('.navbtn');
