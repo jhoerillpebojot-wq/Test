@@ -1,5 +1,5 @@
 // api/signup.js
-//
+
 // Replaces the in-memory `db[email] = {...}` creation in doSignup().
 // Creates a row in `users` AND a matching row in `user_state`
 // (1:1, matching freshState() defaults from the frontend).
