@@ -964,13 +964,21 @@ function ensureStateDefaults(u){
   if(s.lastCheckinDate === undefined) s.lastCheckinDate = null;
   if(!s.quests || !s.quests.progress || !s.quests.claimed) s.quests = freshQuestState();
   if(!Array.isArray(s.tasks)) s.tasks = [];
+  if(!Array.isArray(s.events)) s.events = [];
+  if(!Array.isArray(s.notes)) s.notes = [];
   s.tasks.forEach(t=>{
     if(t.rewarded === undefined){
-      // Best-effort backfill: if it already looks fully done, treat it as
-      // already-rewarded so re-toggling it can't retroactively farm coins.
       t.rewarded = t.subtasks.length>0 && t.subtasks.every(x=>x.done);
     }
+    if(t.celebrated === undefined) t.celebrated = false;
   });
+  // The database doesn't send "next id" counters (Postgres assigns real
+  // ids itself) — but addTask()/addEventManual()/newNote() still make
+  // their own temporary ids client-side until those get migrated too,
+  // so compute safe starting counters here.
+  if(s.nextTaskId === undefined) s.nextTaskId = s.tasks.reduce((max,t)=>Math.max(max,t.id||0), 0) + 1;
+  if(s.nextEventId === undefined) s.nextEventId = s.events.reduce((max,e)=>Math.max(max,e.id||0), 0) + 1;
+  if(s.nextNoteId === undefined) s.nextNoteId = s.notes.reduce((max,n)=>Math.max(max,n.id||0), 0) + 1;
 }
 
 let db = loadDb();
@@ -991,48 +999,75 @@ function switchAuthTab(name){
 }
 
 /* ---------------- AUTH: sign up ---------------- */
-function doSignup(){
+async function doSignup(){
   const name = document.getElementById('suName').value.trim();
   const email = document.getElementById('suEmail').value.trim().toLowerCase();
   const pass = document.getElementById('suPass').value;
   const pass2 = document.getElementById('suPass2').value;
   const err = document.getElementById('signupErr');
+  const btn = document.getElementById('signupBtn');
 
   if(!name){ err.textContent = 'Enter your name.'; return; }
   if(!validEmail(email)){ err.textContent = 'Enter a valid email address.'; return; }
-  if(db[email]){ err.textContent = 'An account with that email already exists.'; return; }
   if(pass.length < 8){ err.textContent = 'Password must be at least 8 characters.'; return; }
   if(pass !== pass2){ err.textContent = 'Passwords don\'t match.'; return; }
 
   err.textContent = '';
-  db[email] = { name, email, role:'student', passHash: hashPass(pass), state: freshState(name) };
-  persist();
-  toast('Account created — welcome to Proacta!');
-  enterApp(db[email]);
-}
+  btn.textContent = 'Creating account…';
+  btn.disabled = true;
 
+  try {
+    const res = await fetch('/api/signup', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name, email, password: pass, password2: pass2 })
+    });
+    const data = await res.json();
+    if(!res.ok){ err.textContent = data.error || 'Something went wrong.'; return; }
+
+    const user = { name: data.user.name, email: data.user.email, role: data.user.role, state: freshState(data.user.name) };
+    db[email] = user;
+    toast('Account created — welcome to Proacta!');
+    enterApp(user);
+  } catch(e){
+    console.error('SIGNUP FETCH ERROR:', e);
+    err.textContent = 'Could not reach the server. Try again.';
+  } finally {
+    btn.textContent = 'Create account';
+    btn.disabled = false;
+  }
+}
 /* ---------------- AUTH: log in ---------------- */
-function doLogin(){
+async function doLogin(){
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginErr');
   const btn = document.getElementById('loginBtn');
 
-  const user = db[email];
-  if(!user || user.passHash !== hashPass(pass)){
-    err.textContent = 'Incorrect email or password.';
-    return;
-  }
   err.textContent = '';
   btn.textContent = 'Logging in…';
   btn.disabled = true;
-  setTimeout(()=>{
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if(!res.ok){ err.textContent = data.error || 'Incorrect email or password.'; return; }
+
+    const user = { name: data.user.name, email: data.user.email, role: data.user.role, state: data.state };
+    db[email] = user;
+    enterApp(user);
+  } catch(e){
+    console.error('LOGIN FETCH ERROR:', e);
+    err.textContent = 'Could not reach the server. Try again.';
+  } finally {
     btn.textContent = 'Log in';
     btn.disabled = false;
-    enterApp(user);
-  }, 350);
+  }
 }
-
 function doLogout(){
   currentUserEmail = null;
   state = null;
