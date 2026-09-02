@@ -2217,34 +2217,6 @@ async function adminDelete(targetUserId, name){
   renderAdmin();
   if(targetUserId === currentUserId){ doLogout(); }
 }
-function adminGrant(email){
-  if(!db[email]) return;
-  db[email].state.premiumActive = true;
-  db[email].state.premiumLabel = 'via admin grant';
-  toast('Premium granted to ' + db[email].name);
-  renderAdmin();
-  if(email===currentUserEmail){ setPerks(true); renderPremiumBanner(); }
-  persist();
-}
-function adminRevoke(email){
-  if(!db[email]) return;
-  db[email].state.premiumActive = false;
-  db[email].state.premiumLabel = '';
-  db[email].state.shieldOn = false;
-  toast('Premium revoked for ' + db[email].name);
-  renderAdmin();
-  if(email===currentUserEmail){ setPerks(false); renderPremiumBanner(); document.getElementById('shieldToggle').classList.remove('on'); }
-  persist();
-}
-function adminDelete(email){
-  if(!db[email] || db[email].role==='admin') return;
-  const name = db[email].name;
-  delete db[email];
-  toast('Deleted account: ' + name);
-  renderAdmin();
-  persist();
-  if(email===currentUserEmail){ doLogout(); }
-}
 
 /* ---------------- INIT ---------------- */
 switchAuthTab('login');
