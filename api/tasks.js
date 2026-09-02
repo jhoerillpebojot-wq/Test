@@ -56,7 +56,9 @@ async function subtasksFor(taskId) {
   const rows = await sql`
     SELECT id, text AS t, done FROM subtasks WHERE task_id = ${taskId} ORDER BY sort_order ASC, id ASC
   `;
-  return rows;
+  // Postgres BIGINT ids come back as text strings from the driver — cast
+  // to Number so the frontend's === comparisons (openTaskId, etc) work.
+  return rows.map(r => ({ ...r, id: Number(r.id) }));
 }
 
 export default async function handler(req, res) {
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
         VALUES (${task.id}, 'Get started', false)
       `;
       const subtasks = await subtasksFor(task.id);
-      return res.status(200).json({ task: { ...task, subtasks } });
+      return res.status(200).json({ task: { ...task, id: Number(task.id), subtasks } });
     }
 
     // Every other action operates on an existing task — load + verify
