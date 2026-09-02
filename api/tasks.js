@@ -21,8 +21,7 @@ async function loadTaskWithOwnerCheck(taskId, userId) {
   return task;
 }
 
-async function bumpQuestServer(userId, questId, amount, target) {
-  const today = new Date().toISOString().slice(0, 10);
+async function bumpQuestServer(userId, questId, amount, target, today) {
   await sql`
     INSERT INTO quest_progress (user_id, quest_date, quest_id, progress, claimed)
     VALUES (${userId}, ${today}, ${questId}, LEAST(${target}, ${amount}), false)
