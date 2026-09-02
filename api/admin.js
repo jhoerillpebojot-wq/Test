@@ -45,9 +45,10 @@ export default async function handler(req, res) {
         JOIN user_state us ON us.user_id = u.id
         ORDER BY u.id ASC
       `;
-      const totalCoins = rows.reduce((sum, r) => sum + r.coins, 0);
-      const premiumCount = rows.filter(r => r.premiumActive).length;
-      return res.status(200).json({ users: rows, totalCoins, premiumCount });
+      const users = rows.map(r => ({ ...r, id: Number(r.id) }));
+      const totalCoins = users.reduce((sum, r) => sum + r.coins, 0);
+      const premiumCount = users.filter(r => r.premiumActive).length;
+      return res.status(200).json({ users, totalCoins, premiumCount });
     }
 
     const { targetUserId } = req.body;
