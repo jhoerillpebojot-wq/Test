@@ -1025,7 +1025,7 @@ async function doSignup(){
     const data = await res.json();
     if(!res.ok){ err.textContent = data.error || 'Something went wrong.'; return; }
 
-    const user = { name: data.user.name, email: data.user.email, role: data.user.role, state: freshState(data.user.name) };
+    const user = { id: data.user.id, name: data.user.name, email: data.user.email, role: data.user.role, state: freshState(data.user.name) };
     db[email] = user;
     toast('Account created — welcome to Proacta!');
     enterApp(user);
@@ -1057,7 +1057,7 @@ async function doLogin(){
     const data = await res.json();
     if(!res.ok){ err.textContent = data.error || 'Incorrect email or password.'; return; }
 
-    const user = { name: data.user.name, email: data.user.email, role: data.user.role, state: data.state };
+    const user = { id: data.user.id, name: data.user.name, email: data.user.email, role: data.user.role, state: data.state };
     db[email] = user;
     enterApp(user);
   } catch(e){
