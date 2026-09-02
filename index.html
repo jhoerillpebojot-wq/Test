@@ -1756,8 +1756,8 @@ async function quickToggle(id){
 /* ---------------- TASKS SCREEN ---------------- */
 function escapeHtml(str){
   const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function renderTasksScreen(){
   const wrap = document.getElementById('taskCards');
