@@ -4,16 +4,17 @@
 // 1. THE BUG: "gemini-3.6-flash" is not a real model id — every call was
 //    failing with a 404-ish "invalid response," which the frontend then
 //    showed as "AI ERROR: The AI server returned an invalid response."
-//    Fixed by pointing at "gemini-flash-latest", Google's auto-updated
-//    alias for their current flash model, so this doesn't rot again the
-//    next time Google ships a new version.
-// 2. Multi-turn context: accepts an optional `history` array so
+// 2. Model + fallback chain: pinned to "gemini-3.5-flash" as the primary
+//    model, with automatic fallback to "gemini-2.5-flash" then
+//    "gemini-flash-latest" if the primary is overloaded (503/429/"high
+//    demand"). A demand spike on one model no longer breaks the feature.
+// 3. Multi-turn context: accepts an optional `history` array so
 //    follow-up questions about a note actually remember earlier turns,
 //    instead of every question being answered in isolation.
-// 3. Google Search grounding: accepts an optional `useSearch` flag so
+// 4. Google Search grounding: accepts an optional `useSearch` flag so
 //    the AI Study Coach can pull in live web results when a student
 //    asks something that goes beyond their note.
-// 4. Real error surfacing: a 200 response with no candidates, or a
+// 5. Real error surfacing: a 200 response with no candidates, or a
 //    candidate blocked by a safety filter, used to silently turn into
 //    an empty string. Now it's reported as an actual error so the UI
 //    doesn't have to guess.
@@ -75,22 +76,41 @@ export default async function handler(req, res) {
       requestBody.tools = [{ google_search: {} }];
     }
 
-    const model = "gemini-flash-latest";
+    // Try 3.5 Flash first, but automatically fall back to other models if
+    // it's overloaded — a single pinned model still goes down whenever
+    // *that* model has a demand spike, so on a 503/"overloaded"/"UNAVAILABLE"
+    // response we retry against the next one in line instead of failing.
+    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify(requestBody)
+    let response, data, usedModel;
+    for (let i = 0; i < modelsToTry.length; i++) {
+      usedModel = modelsToTry[i];
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${usedModel}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify(requestBody)
+        }
+      );
+
+      data = await response.json();
+      console.log("GEMINI STATUS:", usedModel, response.status);
+
+      const isOverloaded =
+        response.status === 503 ||
+        response.status === 429 ||
+        /overload|unavailable|high demand/i.test(data?.error?.message || "");
+
+      if (response.ok || !isOverloaded || i === modelsToTry.length - 1) {
+        break; // success, a non-overload error (don't waste retries on it), or out of options
       }
-    );
+      console.log(`${usedModel} overloaded, falling back to ${modelsToTry[i + 1]}`);
+    }
 
-    const data = await response.json();
-    console.log("GEMINI STATUS:", response.status);
     console.log("GEMINI RESPONSE:", JSON.stringify(data));
 
     if (!response.ok) {
@@ -128,7 +148,7 @@ export default async function handler(req, res) {
       .map(chunk => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
       .filter(Boolean);
 
-    return res.status(200).json({ text, sources });
+    return res.status(200).json({ text, sources, model: usedModel });
   } catch (error) {
     console.error("SERVER ERROR:", error);
     return res.status(500).json({
