@@ -2132,7 +2132,7 @@ async function renderAdmin(){
     document.getElementById('admStatCoins').textContent = data.totalCoins.toLocaleString();
 
     listEl.innerHTML = data.users.map(u=>`
-      <div class="user-row">
+      <div class="user-row" data-id="${u.id}" data-name="${escapeHtml(u.name)}">
         <div class="urow-top">
           <div class="avatar" style="background:var(--violet);">${escapeHtml(u.initials)}</div>
           <div class="uinfo"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>
@@ -2144,15 +2144,32 @@ async function renderAdmin(){
         <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Lv ${u.level} · ${u.coins.toLocaleString()}🪙 · ${u.xp}/${u.xpMax} XP · ${u.streak}🔥 streak</div>
         <div class="uactions">
           ${u.premiumActive
-            ? `<button class="btn btn-ghost btn-sm" onclick="adminRevoke(${u.id})">Revoke premium</button>`
-            : `<button class="btn btn-ghost btn-sm" onclick="adminGrant(${u.id})">Grant premium</button>`}
-          <button class="btn btn-ghost btn-sm" onclick="adminGiveCoins(${u.id}, 1000)">+1000 🪙</button>
-          <button class="btn btn-ghost btn-sm" onclick="adminGiveXp(${u.id}, 1000)">+1000 XP</button>
-          <button class="btn btn-ghost btn-sm" onclick="adminMaxCoins(${u.id})">Max coins</button>
-          ${u.role!=='admin' ? `<button class="btn btn-danger btn-sm" onclick="adminDelete(${u.id}, '${escapeHtml(u.name)}')">Delete account</button>` : ''}
+            ? `<button class="btn btn-ghost btn-sm" data-action="revoke">Revoke premium</button>`
+            : `<button class="btn btn-ghost btn-sm" data-action="grant">Grant premium</button>`}
+          <button class="btn btn-ghost btn-sm" data-action="coins" data-amount="1000">+1000 🪙</button>
+          <button class="btn btn-ghost btn-sm" data-action="xp" data-amount="1000">+1000 XP</button>
+          <button class="btn btn-ghost btn-sm" data-action="maxcoins">Max coins</button>
+          ${u.role!=='admin' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete account</button>` : ''}
         </div>
       </div>
     `).join('');
+
+    listEl.onclick = (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if(!btn) return;
+      const row = btn.closest('.user-row');
+      const id = Number(row.dataset.id);
+      const name = row.dataset.name;
+      const amt = Number(btn.dataset.amount || 0);
+      switch(btn.dataset.action){
+        case 'grant': return adminGrant(id);
+        case 'revoke': return adminRevoke(id);
+        case 'coins': return adminGiveCoins(id, amt);
+        case 'xp': return adminGiveXp(id, amt);
+        case 'maxcoins': return adminMaxCoins(id);
+        case 'delete': return adminDelete(id, name);
+      }
+    };
   } catch(e){
     console.error('ADMIN LIST ERROR:', e);
     listEl.innerHTML = '<div class="empty-row">Could not reach the server.</div>';
