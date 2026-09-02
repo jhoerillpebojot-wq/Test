@@ -21,7 +21,8 @@ export default async function handler(req, res) {
         VALUES (${userId}, ${title}, ${date}, ${note || ''})
         RETURNING id, title, event_date AS date, note
       `;
-      return res.status(200).json({ event });
+      // BIGINT id comes back as a string — cast so frontend === checks work.
+      return res.status(200).json({ event: { ...event, id: Number(event.id) } });
     }
 
     if (action === 'delete') {
