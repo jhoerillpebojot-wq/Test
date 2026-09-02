@@ -25,14 +25,15 @@ export default async function handler(req, res) {
           WHERE id = ${noteId}
           RETURNING id, title, body, updated_at AS "updatedAt"
         `;
-        return res.status(200).json({ note });
+        // BIGINT id comes back as a string — cast so frontend === checks work.
+        return res.status(200).json({ note: { ...note, id: Number(note.id) } });
       } else {
         const [note] = await sql`
           INSERT INTO notes (user_id, title, body)
           VALUES (${userId}, ${title || ''}, ${body || ''})
           RETURNING id, title, body, updated_at AS "updatedAt"
         `;
-        return res.status(200).json({ note });
+        return res.status(200).json({ note: { ...note, id: Number(note.id) } });
       }
     }
 
