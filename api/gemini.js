@@ -1,5 +1,5 @@
 // api/gemini.js
-//
+
 // Fixes vs. the previous version:
 // 1. THE BUG: "gemini-3.6-flash" is not a real model id — every call was
 //    failing with a 404-ish "invalid response," which the frontend then
