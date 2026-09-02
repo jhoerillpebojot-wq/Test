@@ -983,7 +983,7 @@ function ensureStateDefaults(u){
 
 let db = loadDb();
 let pendingResetCodes = {}; // email -> code, intentionally NOT persisted
-let currentUserEmail = null;
+let currentUserId = null;
 let state = null; // pointer into db[currentUserEmail].state while logged in
 let openTaskId = null;
 
@@ -1118,6 +1118,7 @@ function doResetPassword(){
 function enterApp(user){
   ensureStateDefaults(user);
   currentUserEmail = user.email;
+  currentUserId = user.id || null;
   state = user.state;
   ensureQuestsFresh();
   document.getElementById('authScreen').style.display = 'none';
@@ -1687,24 +1688,29 @@ function renderHomeList(){
 // toggling a subtask off and back on would let a student farm unlimited
 // coins/XP from a single task. Completing/uncompleting still works for
 // bookkeeping — it just stops being a coin machine.
-function quickToggle(id){
-  const t = state.tasks.find(x=>x.id===id);
-  const allDone = t.subtasks.every(s=>s.done);
-  if(!allDone){
-    t.subtasks.forEach(s=>s.done=true);
-    if(!t.rewarded){
-      t.rewarded = true;
-      state.coins += 20; addXp(15);
+async function quickToggle(id){
+  try{
+    const res = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'quickToggle', userId: currentUserId, taskId: id })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not update task'); return; }
+    const t = state.tasks.find(x=>x.id===id);
+    t.subtasks = data.subtasks;
+    t.rewarded = data.rewarded;
+    if(data.justRewarded){
+      state.coins = data.userState.coins; state.xp = data.userState.xp;
+      state.xpMax = data.userState.xpMax; state.level = data.userState.level;
       pulseCoins();
-      bumpQuest('completeTask', 1);
       toast('Task complete! +20 coins · +15 XP');
-    } else {
-      toast('Marked complete — already rewarded for this task earlier');
+      ensureQuestsFresh(); state.quests.progress['completeTask'] = 1; renderQuests();
     }
-  } else {
-    t.subtasks.forEach(s=>s.done=false);
+    renderHomeList(); renderTasksScreen(); renderRadar(); renderStats(); renderCramAlert();
+  } catch(e){
+    console.error('QUICK TOGGLE ERROR:', e);
+    toast('Could not reach the server');
   }
-  renderHomeList(); renderTasksScreen(); renderRadar(); renderStats(); renderCramAlert(); persist();
 }
 
 /* ---------------- TASKS SCREEN ---------------- */
@@ -1749,10 +1755,10 @@ function renderTasksScreen(){
       </div>
       <div class="task-card-body">
         ${t.subtasks.map((s,i)=>`
-          <div class="sub-row">
-            <button class="check ${s.done?'done':''}" onclick="toggleSub(${t.id},${i})"></button>
+             <div class="sub-row">
+            <button class="check ${s.done?'done':''}" onclick="toggleSub(${t.id},${s.id})"></button>
             <span class="${s.done?'done-txt':''}" style="${s.done?'color:var(--text-soft); text-decoration:line-through;':''}">${escapeHtml(s.t)}</span>
-            <button class="sub-del" title="Remove step" onclick="removeSub(${t.id},${i})">✕</button>
+            <button class="sub-del" title="Remove step" onclick="removeSub(${t.id},${s.id})">✕</button>
           </div>`).join('')}
         <div class="add-sub-row">
           <input type="text" placeholder="Add a step…" id="newSub-${t.id}" onkeydown="if(event.key==='Enter') addSub(${t.id})">
@@ -1770,59 +1776,97 @@ function toggleCard(id){
 }
 // See the comment on quickToggle() above — same t.rewarded guard here so
 // checking a subtask off and back on can't be used to farm coins/XP.
-function toggleSub(taskId, idx){
-  const t = state.tasks.find(x=>x.id===taskId);
-  t.subtasks[idx].done = !t.subtasks[idx].done;
-  const isComplete = t.subtasks.length>0 && t.subtasks.every(s=>s.done);
-  if(isComplete && !t.rewarded){
-    t.rewarded = true;
-    state.coins += 50; addXp(30);
-    pulseCoins();
-    bumpQuest('completeTask', 1);
-    const headEl = document.querySelector('.task-card.open .task-card-head');
-    confettiBurst(headEl);
-    toast('Task complete! +50 coins · +30 XP');
+// subtaskId is now the database id (see subtasks array), not an array index.
+async function toggleSub(taskId, subtaskId){
+  try{
+    const res = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'toggleSubtask', userId: currentUserId, taskId, subtaskId })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not update step'); return; }
+    const t = state.tasks.find(x=>x.id===taskId);
+    t.subtasks = data.subtasks;
+    t.rewarded = data.rewarded;
+    if(data.justRewarded){
+      state.coins = data.userState.coins; state.xp = data.userState.xp;
+      state.xpMax = data.userState.xpMax; state.level = data.userState.level;
+      pulseCoins();
+      const headEl = document.querySelector('.task-card.open .task-card-head');
+      confettiBurst(headEl);
+      toast('Task complete! +50 coins · +30 XP');
+      ensureQuestsFresh(); state.quests.progress['completeTask'] = 1; renderQuests();
+    }
+    openTaskId = taskId;
+    renderTasksScreen(); renderHomeList(); renderRadar(); renderStats(); renderCramAlert();
+  } catch(e){
+    console.error('TOGGLE SUB ERROR:', e);
+    toast('Could not reach the server');
   }
-  openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderStats(); renderCramAlert(); persist();
 }
-function removeSub(taskId, idx){
-  const t = state.tasks.find(x=>x.id===taskId);
-  t.subtasks.splice(idx,1);
-  openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
+async function removeSub(taskId, subtaskId){
+  try{
+    const res = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'removeSubtask', userId: currentUserId, taskId, subtaskId })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not remove step'); return; }
+    const t = state.tasks.find(x=>x.id===taskId);
+    t.subtasks = data.subtasks;
+    openTaskId = taskId;
+    renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  } catch(e){
+    console.error('REMOVE SUB ERROR:', e);
+    toast('Could not reach the server');
+  }
 }
-function addSub(taskId){
+async function addSub(taskId){
   const input = document.getElementById('newSub-'+taskId);
   const val = input.value.trim();
   if(!val) return;
-  const t = state.tasks.find(x=>x.id===taskId);
-  t.subtasks.push({t:val, done:false});
-  // Adding a genuinely new step is real new work, so let this task earn
-  // its completion reward again once every step (including this one) is
-  // finished — this is intentionally different from re-toggling an
-  // existing step, which stays blocked by the rewarded flag above.
-  t.rewarded = false;
-  openTaskId = taskId;
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
+  try{
+    const res = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'addSubtask', userId: currentUserId, taskId, text: val })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not add step'); return; }
+    const t = state.tasks.find(x=>x.id===taskId);
+    t.subtasks = data.subtasks;
+    t.rewarded = data.rewarded;
+    openTaskId = taskId;
+    renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+  } catch(e){
+    console.error('ADD SUB ERROR:', e);
+    toast('Could not reach the server');
+  }
 }
 function toggleAddForm(){
   document.getElementById('addForm').classList.toggle('show');
 }
-function addTask(){
+async function addTask(){
   const title = document.getElementById('newTaskTitle').value.trim();
   const due = document.getElementById('newTaskDue').value.trim();
   const zone = document.getElementById('newTaskZone').value;
   if(!title) { toast('Give the task a title first'); return; }
-  state.tasks.unshift({
-    id: state.nextTaskId++, title, due: due || 'no date set', zone, rewarded:false,
-    subtasks: [{t:'Get started', done:false}], celebrated:false
-  });
-  document.getElementById('newTaskTitle').value='';
-  document.getElementById('newTaskDue').value='';
-  document.getElementById('addForm').classList.remove('show');
-  renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert(); persist();
-  toast('Task added');
+  try{
+    const res = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'create', userId: currentUserId, title, due, zone })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast(data.error || 'Could not add task'); return; }
+    state.tasks.unshift({ ...data.task, celebrated:false });
+    document.getElementById('newTaskTitle').value='';
+    document.getElementById('newTaskDue').value='';
+    document.getElementById('addForm').classList.remove('show');
+    renderTasksScreen(); renderHomeList(); renderRadar(); renderCramAlert();
+    toast('Task added');
+  } catch(e){
+    console.error('ADD TASK ERROR:', e);
+    toast('Could not reach the server');
+  }
 }
 
 /* ---------------- PREMIUM ---------------- */
