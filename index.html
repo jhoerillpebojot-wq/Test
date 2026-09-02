@@ -2115,6 +2115,8 @@ function setTitle(el, text){
 }
 
 /* ---------------- ADMIN ---------------- */
+let adminUsersCache = [];
+
 async function renderAdmin(){
   const listEl = document.getElementById('adminUserList');
   if(!listEl) return;
@@ -2127,12 +2129,14 @@ async function renderAdmin(){
     const data = await res.json();
     if(!res.ok){ listEl.innerHTML = '<div class="empty-row">'+(data.error||'Could not load accounts')+'</div>'; return; }
 
+    adminUsersCache = data.users; // keep the real objects, ids never round-trip through HTML
+
     document.getElementById('admStatUsers').textContent = data.users.length;
     document.getElementById('admStatPremium').textContent = data.premiumCount;
     document.getElementById('admStatCoins').textContent = data.totalCoins.toLocaleString();
 
-    listEl.innerHTML = data.users.map(u=>`
-      <div class="user-row" data-id="${u.id}" data-name="${escapeHtml(u.name)}">
+    listEl.innerHTML = data.users.map((u,i)=>`
+      <div class="user-row" data-idx="${i}">
         <div class="urow-top">
           <div class="avatar" style="background:var(--violet);">${escapeHtml(u.initials)}</div>
           <div class="uinfo"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.email)}</span></div>
@@ -2158,8 +2162,11 @@ async function renderAdmin(){
       const btn = e.target.closest('button[data-action]');
       if(!btn) return;
       const row = btn.closest('.user-row');
-      const id = Number(row.dataset.id);
-      const name = row.dataset.name;
+      const idx = Number(row.dataset.idx);
+      const u = adminUsersCache[idx];
+      if(!u){ toast('Could not find that account — try reopening Admin'); return; }
+      const id = u.id;
+      const name = u.name;
       const amt = Number(btn.dataset.amount || 0);
       switch(btn.dataset.action){
         case 'grant': return adminGrant(id);
@@ -2175,7 +2182,6 @@ async function renderAdmin(){
     listEl.innerHTML = '<div class="empty-row">Could not reach the server.</div>';
   }
 }
-
 async function adminAction(payload){
   try{
     const res = await fetch('/api/admin', {
